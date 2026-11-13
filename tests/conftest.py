@@ -31,12 +31,13 @@ def audit_path(tmp_path):
 
 @pytest.fixture
 def make_gate(directory, audit_path, tmp_path):
-    def _make(approver=deny_all):
+    def _make(approver=deny_all, requester="jamie@example.test"):
         return Gate(
             directory=directory,
             approver=approver,
             audit=AuditLog(audit_path),
             ticket_id="T-TEST",
+            requester=requester,
             escalation_dir=tmp_path / "logs" / "escalations",
         )
 
