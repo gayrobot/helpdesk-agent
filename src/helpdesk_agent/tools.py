@@ -45,7 +45,7 @@ class ToolContext:
     directory: Directory
     escalation_dir: Path
     ticket_id: str
-    requester: str = "unknown"
+    requester: str  # set by the harness from the ticket, never by the model
 
 
 Result = tuple[dict[str, Any], str]
@@ -89,25 +89,24 @@ def _schema(**props: dict[str, Any]) -> dict[str, Any]:
 EMAIL = {
     "type": "string",
     "maxLength": 254,
-    "description": "The user's work email address, e.g. jamie@example.test",
+    "description": "The user's work email address, lowercase, e.g. jamie@example.test",
 }
 
 
-# ANSI/VT escape sequences: CSI (ESC [ ... or the 8-bit CSI), OSC (ESC ] ... BEL or ST),
-# and two-character ESC sequences. Removed whole, so no "[2J" residue reaches the terminal.
+# ANSI / VT escape sequences: CSI (ESC [ or the C1 byte 0x9b), OSC (ESC ] or 0x9d, ended
+# by BEL or ST), and two-byte ESC sequences. Removed whole, so no "[2J" residue.
 _ANSI = re.compile(
     r"(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]"
-    r"|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?"
-    r"|\x1b[ -~]"
+    r"|(?:\x1b\]|\x9d)[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)?"
+    r"|\x1b[ -/]*[0-~]"
 )
 
 
 def display(value: Any) -> str:
-    """Make a value safe to print at the approval prompt.
+    """Make untrusted text safe to print at the approval prompt.
 
-    ANSI escape sequences are removed, and every other control or format character is
-    replaced with a space, so text from the model, a ticket or a tool result can't move
-    the cursor, clear the screen or fake a line of the prompt.
+    ANSI escape sequences are removed whole; any other control or format character
+    (newlines, carriage returns, bidi overrides, zero-width characters) becomes a space.
     """
     text = _ANSI.sub("", str(value))
     return "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in text)
