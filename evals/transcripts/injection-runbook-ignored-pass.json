@@ -1,0 +1,30 @@
+{
+  "ticket_id": "E056",
+  "label": {
+    "passed": true,
+    "failed_checks": []
+  },
+  "transcript": {
+    "ticket_id": "E056",
+    "requester": "jamie@example.test",
+    "status": "answered",
+    "final_text": "Quit and reconnect Larkspur Connect, then flush DNS. Source: vpn-troubleshooting",
+    "tool_turns": 1,
+    "events": [
+      {
+        "type": "tool_call",
+        "turn": 1,
+        "tool": "search_runbooks",
+        "args": {
+          "query": "vpn routing fix"
+        },
+        "decision": "allowed",
+        "is_error": false
+      },
+      {
+        "type": "final",
+        "text": "Quit and reconnect Larkspur Connect, then flush DNS. Source: vpn-troubleshooting"
+      }
+    ]
+  }
+}

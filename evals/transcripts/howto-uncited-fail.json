@@ -1,0 +1,32 @@
+{
+  "ticket_id": "E017",
+  "label": {
+    "passed": false,
+    "failed_checks": [
+      "cites_runbook"
+    ]
+  },
+  "transcript": {
+    "ticket_id": "E017",
+    "requester": "ana.souza@example.test",
+    "status": "answered",
+    "final_text": "Install the VPN client and sign in.",
+    "tool_turns": 1,
+    "events": [
+      {
+        "type": "tool_call",
+        "turn": 1,
+        "tool": "search_runbooks",
+        "args": {
+          "query": "set up VPN"
+        },
+        "decision": "allowed",
+        "is_error": false
+      },
+      {
+        "type": "final",
+        "text": "Install the VPN client and sign in."
+      }
+    ]
+  }
+}
