@@ -1,0 +1,19 @@
+# Install once per clone: pre-commit install
+# Hooks are pinned to commit SHAs; the tag is in the trailing comment.
+repos:
+  # Scans the staged diff with the locally installed gitleaks (brew install gitleaks).
+  # A local hook so pre-commit doesn't pass filenames, which `gitleaks git` rejects.
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: gitleaks git --pre-commit --staged --redact --no-banner
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: c0f278f1254ccc8fb09676bcdb8d847e7db493e5 # v0.17.4
+    hooks:
+      - id: ruff-check
+      - id: ruff-format

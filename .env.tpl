@@ -1,0 +1,3 @@
+# Committed on purpose. Holds 1Password references, never values.
+# Run with: op run --env-file=.env.tpl -- uv run helpdesk-agent ...
+ANTHROPIC_API_KEY=op://Private/Anthropic helpdesk-agent-dev/credential
