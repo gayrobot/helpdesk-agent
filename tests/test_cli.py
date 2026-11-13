@@ -73,3 +73,32 @@ def test_run_live_path_with_fake(monkeypatch, tmp_path):
     )
     assert code == 0
     assert "[answered]" in out.getvalue()
+
+
+def test_eval_retrieval_bm25(monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.chdir(Path(__file__).parent.parent)
+    out = io.StringIO()
+    assert main(["eval-retrieval", "--json"], out=out) == 0
+    scores = json.loads(out.getvalue())
+    assert scores[0]["retriever"] == "bm25"
+    assert scores[0]["recall@3"] >= 0.9
+
+
+def test_eval_retrieval_embeddings_without_fastembed_says_so(monkeypatch):
+    import builtins
+    from pathlib import Path
+
+    real_import = builtins.__import__
+
+    def no_fastembed(name, *args, **kwargs):
+        if name == "fastembed":
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.chdir(Path(__file__).parent.parent)
+    monkeypatch.setattr(builtins, "__import__", no_fastembed)
+    out = io.StringIO()
+    assert main(["eval-retrieval", "--embeddings"], out=out) == 2
+    assert "dependency-reviews/fastembed.md" in out.getvalue()

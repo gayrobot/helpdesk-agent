@@ -7,6 +7,7 @@ from helpdesk_agent.tools import TOOLS, ToolKind, api_tool_definitions, display
 
 EXPECTED = {
     "lookup_user": ToolKind.READ,
+    "search_runbooks": ToolKind.READ,
     "list_devices": ToolKind.READ,
     "reset_mfa": ToolKind.WRITE,
     "add_to_group": ToolKind.WRITE,
