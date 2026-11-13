@@ -4,7 +4,7 @@ A small, governed IT helpdesk agent on the Claude API. It answers IT requests fo
 
 **All data is synthetic.** No real people, credentials or company data.
 
-Status: Phase 1 (repo setup and secret hygiene). See [docs/plan.md](docs/plan.md).
+Status: Phase 1 (repo setup and secret hygiene). See [docs/plan.md](docs/plan.md). Manual, owner-only steps are in [docs/operator-checklist.md](docs/operator-checklist.md).
 
 ## Governance model
 
