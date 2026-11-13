@@ -16,7 +16,6 @@ EXPECTED = {
 
 
 def test_registry_is_exactly_the_allowlist():
-    # search_runbooks joins in Phase 4.
     assert {name: spec.kind for name, spec in TOOLS.items()} == EXPECTED
 
 
