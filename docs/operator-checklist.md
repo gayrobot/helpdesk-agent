@@ -119,28 +119,45 @@ The subcommand names below follow `docs/plan.md`; the Phase 3 PR may change flag
 - [ ] **Run it again after one system prompt change** and keep both result files; the plan's "done" needs a measurable difference.
 - [ ] **Check spend** in the Console against the cap, and review `evals/results/*.json` before committing them (synthetic data only, no key, no full prompts you wouldn't publish).
 
-## 4. Phase 6: publish the write-up on damiano.dev
+## 4. Phase 6: the project on its own subdomain, featured on damiano.dev
 
-### How the site is served (checked 2026-11-13, read-only Cloudflare API)
+**Not before launch.** Phase 6 starts only after the live steps in section 3 are done and there are real eval numbers. Nothing here is built or created in Cloudflare before then.
+
+**Decided 2026-11-13 (Skylar):** the project lives on its own subdomain, e.g. `helpdesk-agent.damiano.dev`, and gets a project entry on damiano.dev like the other projects. It's built with the same setup as damiano.dev: the same Cloudflare account and zone, a Worker serving static assets, previews on every PR, deploys from GitHub Actions on `main` only, and one check gating every deploy.
+
+### How damiano.dev is served (checked 2026-11-13, read-only Cloudflare API)
 
 - The `damiano.dev` zone is on Cloudflare (Free plan). `damiano.dev` and `www.damiano.dev` are **Workers custom domains** bound to the Worker `damiano-dev`. There's no Pages project.
 - The Worker serves a static **Astro** build with Workers static assets (`assets.directory = ./dist`, no server code). Source: the public repo `gayrobot/damiano.dev`, which has `src/content/projects/` and `src/pages/projects/`.
 - **Preview:** `.github/workflows/preview.yml` in that repo runs on every PR that touches `src/**` and uploads a Worker version with the alias `pr-<N>`. It comments the preview URL on the PR. Nothing is promoted.
 - **Production:** merging to `main` deploys, through the deploy job in its `ci.yml` only.
 
-So publishing the write-up is a content PR in the site repo. It needs no new DNS record, route, Worker, Pages project or `wrangler login`.
 
-### Steps
+So the work has two parts: the subdomain site, and an entry in the damiano.dev project list.
 
-- [ ] **Draft the page.** Claude can do this, in a PR to `gayrobot/damiano.dev`: a new entry under `src/content/projects/` (e.g. `helpdesk-agent.md`) following the existing entries. The URL becomes `damiano.dev/projects/<slug>`. Content: problem, architecture, governance rules, real eval numbers, cost per ticket, retrieval comparison, what fails and why. It waits for the Phase 5 live numbers.
-- [ ] **Review the write-up for data.** GitHub PR, Skylar. Real eval numbers and cost are fine. No key, no request IDs, no real names, nothing from employers, only `example.test` data in screenshots and transcripts. The site's `npm run check:privacy` and `lint:content` checks help but don't replace reading it.
-- [ ] **Check the preview.** Browser, Skylar: open the `pr-<N>` URL that the preview workflow comments on the PR, on desktop and phone. Check links, images, and that the numbers match `evals/results/`.
-- [ ] **Merge to publish.** GitHub UI, Skylar. Merging to `main` deploys to production. Then check `https://damiano.dev/projects/<slug>` live.
-- [ ] **Link the page from this repo's README** in a PR once it's live.
+### How other projects are featured
 
-The Cloudflare dashboard and `wrangler login` are needed only if the preview workflow fails for a credentials reason. Its token lives in the site repo's `preview` GitHub environment as `CLOUDFLARE_API_TOKEN`; if it expired, Skylar makes a new one in the Cloudflare dashboard (My Profile → API Tokens, Workers edit, this account only) and replaces the environment secret.
+Each project is one file in `gayrobot/damiano.dev` under `src/content/projects/` (today `hvrad-io.md`, `netstack.md`, `ride-waits.md`). The front matter has `title`, `date`, `summary`, `status`, `tags`, `url` (the project's own domain) and `featured: true`, then a write-up in Markdown. `hvrad.io` and `ride-waits` each run as their own Worker on their own domain, and the entry links out to them. The helpdesk-agent entry follows the same pattern, with `url: https://helpdesk-agent.damiano.dev`.
 
-Claude may draft the page and open the PR, but doesn't run `wrangler`, create Cloudflare resources or merge.
+### Decide at the start of Phase 6
+
+- [ ] **What the subdomain serves.** Skylar. The agent is a CLI with a paid API key and a human write gate, so it can't simply be put online as is. Options:
+  - **Static site (recommended starting point):** the write-up, architecture, governance rules, eval results from `evals/results/`, cost per ticket, and recorded transcripts of real runs (synthetic data only). No key on the server, no spend exposure.
+  - **Live demo:** a Worker that holds an Anthropic key and runs tickets on request. Needs its own design first: a separate workspace key with a low spend limit stored as a Worker secret, rate limiting and abuse protection (e.g. Turnstile), no real write tools (the write gate can't be a stranger on the internet), and logging that never stores visitor text we wouldn't publish. Treat it as its own phase.
+- [ ] **Where its source lives.** Skylar. Either a `site/` folder in this repo (next to the code and `evals/results/`) or a separate repo like `hvrad.io`. Either way it copies damiano.dev's harness: `wrangler.jsonc` with assets, a CI workflow with a deploy job behind a `production` GitHub environment, and a preview workflow behind a `preview` environment.
+
+### Steps (after launch)
+
+- [ ] **Build the site.** Claude, in a PR, following damiano.dev's setup (Astro, Workers static assets, pinned dependencies, actions pinned by SHA). Claude doesn't deploy.
+- [ ] **Create a scoped Cloudflare API token.** Cloudflare dashboard (My Profile → API Tokens), Skylar. Workers edit for this account only. Store it in 1Password, then as `CLOUDFLARE_API_TOKEN` in the new repo's `production` and `preview` GitHub environments (GitHub UI → Settings → Environments), with `CLOUDFLARE_ACCOUNT_ID` as an environment variable. Limit `production` to the `main` branch.
+- [ ] **Turn on secret scanning, push protection, Dependabot alerts, required SHA pinning and branch protection** on the new repo if it's separate (GitHub UI), matching section 2.
+- [ ] **First deploy and the custom domain.** Merging to `main` creates the Worker. Then Cloudflare dashboard → Workers & Pages → the new Worker → Settings → Domains & Routes → add `helpdesk-agent.damiano.dev`; Cloudflare creates the DNS record and certificate. Skylar does this, or tells Claude to in the session.
+- [ ] **Check the preview, then production.** Browser, Skylar: the `pr-<N>` preview link on the PR, then `https://helpdesk-agent.damiano.dev` on desktop and phone. Numbers must match `evals/results/`.
+- [ ] **Add the project entry to damiano.dev.** Claude, in a PR to `gayrobot/damiano.dev`: `src/content/projects/helpdesk-agent.md` with the same front matter as the others and `url: https://helpdesk-agent.damiano.dev`. Skylar reviews the preview the site's workflow posts, and merges. The merge deploys through Actions.
+- [ ] **Review both for data.** Skylar, before each merge. Real eval numbers and cost are fine. No key, no request IDs, no real names, nothing from employers, only `example.test` data.
+- [ ] **Link the subdomain from this repo's README** in a PR once it's live.
+
+Claude may build both and open the PRs. It doesn't run `wrangler deploy`, create tokens, or merge.
 
 ### Fixed: double deploy
 
