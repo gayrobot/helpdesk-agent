@@ -10,6 +10,13 @@ dependencies = [
     "anthropic==2.6.0",
 ]
 
+[project.optional-dependencies]
+# Local embeddings for the Phase 4 retrieval comparison. Optional and local-only: CI and
+# the default install don't include it. Review: docs/dependency-reviews/fastembed.md
+embeddings = [
+    "fastembed==0.9.1",
+]
+
 [project.scripts]
 helpdesk-agent = "helpdesk_agent.cli:main"
 

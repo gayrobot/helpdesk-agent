@@ -1,0 +1,38 @@
+{"id": "R001", "query": "How do I get on the VPN from home for the first time?", "expected_runbook": "vpn-setup"}
+{"id": "R002", "query": "Which app do I install to connect to internal tools remotely?", "expected_runbook": "vpn-setup"}
+{"id": "R003", "query": "Do I have to disconnect the VPN to join a Zoom call?", "expected_runbook": "vpn-setup"}
+{"id": "R004", "query": "VPN says portal unreachable at the hotel", "expected_runbook": "vpn-troubleshooting"}
+{"id": "R005", "query": "I'm connected to the VPN but the wiki won't load", "expected_runbook": "vpn-troubleshooting"}
+{"id": "R006", "query": "Larkspur Connect keeps saying authentication failed", "expected_runbook": "vpn-troubleshooting"}
+{"id": "R007", "query": "I got a new phone and can't approve sign-in pushes anymore", "expected_runbook": "okta-verify-reenrollment"}
+{"id": "R008", "query": "How do I set up Okta Verify again after my MFA was reset?", "expected_runbook": "okta-verify-reenrollment"}
+{"id": "R009", "query": "I lost my security key, what now?", "expected_runbook": "okta-verify-reenrollment"}
+{"id": "R010", "query": "How long does my password need to be?", "expected_runbook": "password-policy"}
+{"id": "R011", "query": "I forgot my password, how do I reset it myself?", "expected_runbook": "password-policy"}
+{"id": "R012", "query": "My account is locked after too many attempts", "expected_runbook": "password-policy"}
+{"id": "R013", "query": "My Mac says it's not compliant and lost access to Drive", "expected_runbook": "jamf-enrollment"}
+{"id": "R014", "query": "How do I re-enroll my MacBook in device management?", "expected_runbook": "jamf-enrollment"}
+{"id": "R015", "query": "When will my Mac be forced to update macOS?", "expected_runbook": "jamf-enrollment"}
+{"id": "R016", "query": "Where do I install apps on my Windows laptop?", "expected_runbook": "windows-intune-enrollment"}
+{"id": "R017", "query": "Company Portal says my laptop is non-compliant, BitLocker?", "expected_runbook": "windows-intune-enrollment"}
+{"id": "R018", "query": "Can I get a Figma seat?", "expected_runbook": "software-requests"}
+{"id": "R019", "query": "I need a tool that isn't in Self Service, how do I request it?", "expected_runbook": "software-requests"}
+{"id": "R020", "query": "Can I install a Chrome extension that's blocked?", "expected_runbook": "software-requests"}
+{"id": "R021", "query": "How do I get added to the salesforce-users group?", "expected_runbook": "access-requests"}
+{"id": "R022", "query": "Can my manager request GitHub access for me?", "expected_runbook": "access-requests"}
+{"id": "R023", "query": "How does someone get admin rights?", "expected_runbook": "access-requests"}
+{"id": "R024", "query": "A contractor needs access to another group", "expected_runbook": "access-requests"}
+{"id": "R025", "query": "My new starter's laptop hasn't arrived for Monday", "expected_runbook": "new-hire-onboarding"}
+{"id": "R026", "query": "What should a new employee do on their first day?", "expected_runbook": "new-hire-onboarding"}
+{"id": "R027", "query": "What happens to a leaver's files and email?", "expected_runbook": "offboarding"}
+{"id": "R028", "query": "How do I return my laptop when I leave?", "expected_runbook": "offboarding"}
+{"id": "R029", "query": "My laptop was stolen from my car", "expected_runbook": "lost-or-stolen-device"}
+{"id": "R030", "query": "I left my work phone in a taxi", "expected_runbook": "lost-or-stolen-device"}
+{"id": "R031", "query": "How do I let my assistant manage my calendar?", "expected_runbook": "email-and-calendar"}
+{"id": "R032", "query": "I need to be added to the support@ shared mailbox", "expected_runbook": "email-and-calendar"}
+{"id": "R033", "query": "An email from a customer never showed up", "expected_runbook": "email-and-calendar"}
+{"id": "R034", "query": "I think I clicked a phishing link", "expected_runbook": "phishing-reporting"}
+{"id": "R035", "query": "I'm getting MFA prompts I didn't trigger", "expected_runbook": "phishing-reporting"}
+{"id": "R036", "query": "What's the guest Wi-Fi password?", "expected_runbook": "office-wifi-and-printing"}
+{"id": "R037", "query": "How do I print in the office?", "expected_runbook": "office-wifi-and-printing"}
+{"id": "R038", "query": "My laptop won't join the staff Wi-Fi", "expected_runbook": "office-wifi-and-printing"}

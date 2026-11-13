@@ -7,6 +7,7 @@ from helpdesk_agent.tools import TOOLS, ToolKind, api_tool_definitions, display
 
 EXPECTED = {
     "lookup_user": ToolKind.READ,
+    "search_runbooks": ToolKind.READ,
     "list_devices": ToolKind.READ,
     "reset_mfa": ToolKind.WRITE,
     "add_to_group": ToolKind.WRITE,
@@ -15,7 +16,6 @@ EXPECTED = {
 
 
 def test_registry_is_exactly_the_allowlist():
-    # search_runbooks joins in Phase 4.
     assert {name: spec.kind for name, spec in TOOLS.items()} == EXPECTED
 
 

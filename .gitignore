@@ -9,6 +9,9 @@ logs/
 # ...except the eval ticket set, which is synthetic and versioned
 !evals/**/*.jsonl
 
+# Downloaded model weights (pinned and hash-checked in retrieval.py)
+.cache/
+
 # Python
 __pycache__/
 *.py[cod]
