@@ -126,7 +126,7 @@ The subcommand names below follow `docs/plan.md`; the Phase 3 PR may change flag
 - The `damiano.dev` zone is on Cloudflare (Free plan). `damiano.dev` and `www.damiano.dev` are **Workers custom domains** bound to the Worker `damiano-dev`. There's no Pages project.
 - The Worker serves a static **Astro** build with Workers static assets (`assets.directory = ./dist`, no server code). Source: the public repo `gayrobot/damiano.dev`, which has `src/content/projects/` and `src/pages/projects/`.
 - **Preview:** `.github/workflows/preview.yml` in that repo runs on every PR that touches `src/**` and uploads a Worker version with the alias `pr-<N>`. It comments the preview URL on the PR. Nothing is promoted.
-- **Production:** merging to `main` deploys (the deploy job in its `ci.yml`). The Worker also has a Workers Builds trigger on `main` (`npm run build`, then `npx wrangler deploy`). See the follow-up below.
+- **Production:** merging to `main` deploys, through the deploy job in its `ci.yml` only.
 
 So publishing the write-up is a content PR in the site repo. It needs no new DNS record, route, Worker, Pages project or `wrangler login`.
 
@@ -142,9 +142,9 @@ The Cloudflare dashboard and `wrangler login` are needed only if the preview wor
 
 Claude may draft the page and open the PR, but doesn't run `wrangler`, create Cloudflare resources or merge.
 
-### Follow-up found while checking
+### Fixed: double deploy
 
-- [ ] **Two production deploy paths on `main`.** Both the site's GitHub Actions deploy job and the Cloudflare Workers Builds trigger deploy on every push to `main`. Recent versions were uploaded by `wrangler` from Actions. Decide which one you want, then disconnect the other in the Cloudflare dashboard (Workers & Pages → `damiano-dev` → Settings → Build) or remove the job, so one merge doesn't deploy twice. This belongs to the site repo, not this one.
+- [x] **One production deploy path.** Until 2026-11-13 both the site's GitHub Actions deploy job and a Cloudflare Workers Builds trigger deployed on every push to `main`; the build history shows both ran for the same commits. At Skylar's request, Claude deleted the Workers Builds trigger through the Cloudflare API that day, so only Actions deploys. The unused build token named `damiano-dev` and the GitHub repo connection are still there; remove them in the dashboard (Workers & Pages → `damiano-dev` → Settings → Build) if you like.
 
 ## 5. Dependency reviews (when a phase adds one)
 
