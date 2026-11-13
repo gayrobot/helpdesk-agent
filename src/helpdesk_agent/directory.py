@@ -18,14 +18,35 @@ PRIVILEGED_NAME_MARKERS = ("admin", "root", "privileged", "super", "approver", "
 
 
 def normalize(value: str) -> str:
-    """Canonical form for lookups: NFKC, invisible format characters removed, casefolded.
+    """Canonical form for lookups: NFKC, invisible format characters removed, whitespace
+    trimmed and collapsed, casefolded.
 
     Lookups are exact matches on this form, so look-alike or padded names either resolve
     to the real record or to nothing. They never resolve to something unexpected.
     """
     text = unicodedata.normalize("NFKC", value)
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
-    return text.strip().casefold()
+    return " ".join(text.split()).casefold()
+
+
+def letter_scripts(value: str) -> set[str]:
+    """The writing systems of the letters in ``value``, after NFKC (so fullwidth Latin
+    counts as Latin). Digits, punctuation and spaces don't count.
+
+    The standard library has no Unicode script property, so this uses the first word of
+    each letter's Unicode name (LATIN, CYRILLIC, GREEK, ...). That is enough to catch a
+    look-alike letter from another alphabet hiding in a name.
+    """
+    text = unicodedata.normalize("NFKC", value)
+    scripts = set()
+    for ch in text:
+        if unicodedata.category(ch).startswith("L"):
+            scripts.add(unicodedata.name(ch, "UNKNOWN").split(" ")[0])
+    return scripts
+
+
+def is_mixed_script(value: str) -> bool:
+    return len(letter_scripts(value)) > 1
 
 
 @dataclass
