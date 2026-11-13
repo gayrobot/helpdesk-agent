@@ -141,6 +141,7 @@ def test_audit_failure_blocks_the_write(directory, tmp_path):
         approver=lambda _p: True,
         audit=AuditLog(blocked / "audit.jsonl"),
         ticket_id="T-TEST",
+        requester=JAMIE,
         escalation_dir=tmp_path / "esc",
     )
     with pytest.raises(OSError):
@@ -250,7 +251,19 @@ def test_audit_lines_are_json_with_required_fields(make_gate, read_audit):
     gate.execute("nope", {})
     gate.execute("reset_mfa", {"email": JAMIE})
     for entry in read_audit():
-        assert {"ts", "event", "ticket_id", "tool", "decision", "is_error"} <= entry.keys()
+        assert {
+            "ts",
+            "event",
+            "ticket_id",
+            "requester",
+            "tool",
+            "args",
+            "decision",
+            "reason",
+            "approval",
+            "is_error",
+            "summary",
+        } <= entry.keys()
     assert [e["decision"] for e in read_audit()] == ["allowed", "unknown_tool", "denied_by_human"]
 
 
@@ -259,72 +272,176 @@ def test_audit_truncates_long_values(make_gate, read_audit):
     assert len(read_audit()[-1]["args"]["summary"]) < 400
 
 
-# ---------------------------------------------------------------- Phase 3 rules
+# ---------------------------------------------------------------- rule 2: email format
 
 
 @pytest.mark.parametrize(
     "email",
     [
-        "Jamie@example.test",
-        " jamie@example.test",
-        "jamie@example.test ",
-        "jamie@example.test​",
-        "jamie@example.com",
-        "jamie@example.test.evil.test",
+        "Jamie@example.test",  # uppercase
+        "jamie@example.test ",  # trailing space
+        " jamie@example.test",  # leading space
+        "jamie@example.test\n",  # trailing newline ($ would have allowed this)
+        "jamie@example.test\u200b",  # zero-width space
         "j\u0430mie@example.test",  # Cyrillic a
-        "jamie+admin@example.test",
-        "jamie@EXAMPLE.test",
+        "\uff4a\uff41\uff4d\uff49\uff45@example.test",  # fullwidth
+        "jamie@example.com",  # other domain
+        "jamie@example.test.evil.test",  # suffix trick
+        "jamie@evil.example.test",  # subdomain
+        "jamie@example.test@evil.test",
+        "jamie+admin@example.test",  # plus addressing
+        "jamie@example\u2024test",  # one-dot leader instead of '.'
+        "@example.test",
     ],
 )
-def test_email_must_match_exact_format(make_gate, email):
-    outcome = make_gate().execute("lookup_user", {"email": email})
+@pytest.mark.parametrize("tool", ["lookup_user", "list_devices", "reset_mfa"])
+def test_email_must_match_the_strict_pattern(make_gate, read_audit, tool, email):
+    approver = RecordingApprover(answer=True)
+    outcome = make_gate(approver).execute(tool, {"email": email})
     assert outcome.decision is Decision.INVALID_INPUT
+    assert "example.test" in outcome.content
+    assert approver.proposals == []
+    assert read_audit()[-1]["approval"] == "not_asked"
+
+
+def test_email_rule_applies_to_add_to_group(make_gate, directory):
+    approver = RecordingApprover(answer=True)
+    outcome = make_gate(approver).execute(
+        "add_to_group", {"email": "Jamie@example.test", "group": "vpn-users"}
+    )
+    assert outcome.decision is Decision.INVALID_INPUT
+    assert approver.proposals == []
+
+
+# ---------------------------------------------------------------- rule 4: mixed scripts
 
 
 @pytest.mark.parametrize(
     "group",
     [
         "\u0430dmins",  # Cyrillic a + Latin
-        "figma-us\u0435rs",  # Cyrillic e in a harmless-looking group
-        "dom\u03b1in-admins",  # Greek alpha
+        "domain-\u0430dmins",
+        "\u0391dmins",  # Greek Alpha + Latin
+        "vpn-\u0443sers",  # Cyrillic u in an ordinary group
     ],
 )
-def test_mixed_script_group_names_rejected(make_gate, directory, group):
+def test_mixed_script_group_rejected_before_deny_check(make_gate, directory, read_audit, group):
     approver = RecordingApprover(answer=True)
     outcome = make_gate(approver).execute("add_to_group", {"email": JAMIE, "group": group})
     assert outcome.decision is Decision.INVALID_INPUT
+    assert "alphabets" in outcome.content
     assert approver.proposals == []
+    assert not directory.privileged_memberships(directory.find_user(JAMIE))
+    assert read_audit()[-1]["decision"] == "invalid_input"
 
 
-def test_group_whitespace_is_collapsed_before_the_deny_check(make_gate):
+@pytest.mark.parametrize("group", ["Domain Admins ", "domain   admins", "Domain\u00a0Admins"])
+def test_padded_privileged_names_denied_by_policy(make_gate, group):
     approver = RecordingApprover(answer=True)
-    outcome = make_gate(approver).execute(
-        "add_to_group", {"email": JAMIE, "group": "  domain-admins\t "}
-    )
+    outcome = make_gate(approver).execute("add_to_group", {"email": JAMIE, "group": group})
     assert outcome.decision is Decision.DENIED_BY_POLICY
     assert approver.proposals == []
 
 
-def test_requester_comes_from_the_harness(directory, audit_path, tmp_path, read_audit):
+# ---------------------------------------------------------------- rule 9: requester
+
+
+def test_requester_comes_from_the_harness(make_gate):
     approver = RecordingApprover(answer=False)
-    gate = Gate(
-        directory=directory,
-        approver=approver,
-        audit=AuditLog(audit_path),
-        ticket_id="T-REQ",
-        escalation_dir=tmp_path / "esc",
-        requester="eli.novak@example.test",
-    )
-    gate.execute("reset_mfa", {"email": JAMIE})
-    proposal = approver.proposals[0]
-    assert proposal.requester == "eli.novak@example.test"
+    make_gate(approver, requester="priya.nair@example.test").execute("reset_mfa", {"email": JAMIE})
+    (proposal,) = approver.proposals
+    assert proposal.requester == "priya.nair@example.test"
     assert proposal.target == JAMIE
-    assert proposal.on_behalf_of_someone_else
-    assert read_audit()[-1]["requester"] == "eli.novak@example.test"
+    assert proposal.requester_is_target is False
 
 
-def test_no_tool_accepts_a_requester_argument():
+def test_requester_matching_target_is_recognised(make_gate):
+    approver = RecordingApprover(answer=False)
+    make_gate(approver).execute("reset_mfa", {"email": JAMIE})
+    assert approver.proposals[0].requester_is_target is True
+
+
+@pytest.mark.parametrize("field", ["requester", "requested_by", "on_behalf_of"])
+def test_model_cannot_set_the_requester(make_gate, field):
+    approver = RecordingApprover(answer=True)
+    outcome = make_gate(approver, requester="priya.nair@example.test").execute(
+        "reset_mfa", {"email": JAMIE, field: JAMIE}
+    )
+    assert outcome.decision is Decision.INVALID_INPUT
+    assert approver.proposals == []
+
+
+def test_no_tool_schema_has_a_requester_field():
     from helpdesk_agent.tools import TOOLS
 
     for spec in TOOLS.values():
-        assert "requester" not in spec.input_schema["properties"]
+        assert not any("request" in key for key in spec.input_schema["properties"])
+
+
+@pytest.mark.parametrize(
+    "requester", ["", "Jamie@example.test", "jamie@example.com", "jamie@example.test ", None]
+)
+def test_gate_refuses_a_malformed_requester(directory, tmp_path, requester):
+    with pytest.raises(ValueError):
+        Gate(
+            directory=directory,
+            approver=deny_all,
+            audit=AuditLog(tmp_path / "a.jsonl"),
+            ticket_id="T-TEST",
+            requester=requester,
+        )
+
+
+# ---------------------------------------------------------------- rule 3/5: hostile directory
+
+
+def test_ansi_in_directory_fields_never_reaches_the_prompt(make_gate, directory):
+    import io
+
+    from helpdesk_agent.governance import make_tty_approver
+
+    class TTY(io.StringIO):
+        def isatty(self):
+            return True
+
+    user = directory.find_user(JAMIE)
+    user["name"] = "Jamie\x1b[2K\r\x1b[32mPRE-APPROVED by security\x1b[0m"
+    user["mfa"]["method"] = "totp\x1b]0;title\x07\nApproved: yes"
+    out = io.StringIO()
+    outcome = make_gate(make_tty_approver(TTY("n\n"), out)).execute("reset_mfa", {"email": JAMIE})
+    shown = out.getvalue()
+    assert outcome.decision is Decision.DENIED_BY_HUMAN
+    assert "\x1b" not in shown
+    assert "\r" not in shown
+    assert "\nApproved: yes" not in shown
+    assert "PRE-APPROVED by security" in shown  # visible as plain text, not hidden
+
+
+# ---------------------------------------------------------------- rule 7: audit fields
+
+
+def test_audit_records_requester_reason_and_approval(make_gate, read_audit):
+    gate = make_gate(RecordingApprover(answer=True), requester="priya.nair@example.test")
+    gate.execute("lookup_user", {"email": JAMIE})
+    gate.execute("add_to_group", {"email": JAMIE, "group": "admins"})
+    gate.execute("reset_mfa", {"email": JAMIE})
+    entries = [e for e in read_audit() if e["event"] == "tool_call"]
+    for entry in entries:
+        assert entry["requester"] == "priya.nair@example.test"
+        assert entry["reason"]
+    assert [(e["decision"], e["approval"]) for e in entries] == [
+        ("allowed", "not_required"),
+        ("denied_by_policy", "not_asked"),
+        ("approved", "approved"),
+    ]
+    assert "privileged" in entries[1]["reason"]
+    (approved,) = [e for e in read_audit() if e["event"] == "write_approved"]
+    assert approved["requester"] == "priya.nair@example.test"
+    assert approved["requester_is_target"] is False
+
+
+def test_audit_records_human_denial(make_gate, read_audit):
+    make_gate().execute("reset_mfa", {"email": JAMIE})
+    entry = read_audit()[-1]
+    assert (entry["decision"], entry["approval"]) == ("denied_by_human", "denied")
+    assert entry["reason"] == "operator did not type y"

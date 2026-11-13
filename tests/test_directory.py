@@ -1,6 +1,6 @@
 import pytest
 
-from helpdesk_agent.directory import Directory, normalize
+from helpdesk_agent.directory import Directory, is_mixed_script, normalize
 
 
 def test_loads_synthetic_company(directory):
@@ -84,3 +84,34 @@ def test_writes_do_not_leak_between_loads():
 
 def test_normalize_strips_format_characters():
     assert normalize("a\u200bdmins\u2060") == "admins"
+
+
+@pytest.mark.parametrize("name", ["Domain Admins ", "domain   admins", "\tDomain\u00a0Admins\n"])
+def test_normalize_trims_and_collapses_whitespace(name):
+    assert normalize(name) == "domain admins"
+
+
+@pytest.mark.parametrize(
+    ("name", "mixed"),
+    [
+        ("admins", False),
+        ("domain-admins", False),
+        ("\uff21\uff44\uff4d\uff49\uff4e\uff53", False),  # fullwidth Latin is Latin after NFKC
+        ("vpn-users-2", False),
+        ("\u0430dmins", True),  # Cyrillic a
+        ("adm\u0456ns", True),  # Cyrillic i
+        ("\u0391dmins", True),  # Greek capital alpha
+        ("\u0430\u0434\u043c\u0438\u043d", False),  # all Cyrillic: one script
+    ],
+)
+def test_mixed_script_detection(name, mixed):
+    assert is_mixed_script(name) is mixed
+
+
+def test_every_directory_email_is_reachable_through_the_email_rule(directory):
+    """If a real record broke the rule-2 pattern, the agent could never act on it."""
+    from helpdesk_agent.governance import EMAIL_PATTERN
+
+    emails = [u["email"] for u in directory.users.values()]
+    emails += [d["owner"] for d in directory.devices]
+    assert all(EMAIL_PATTERN.match(e) for e in emails)

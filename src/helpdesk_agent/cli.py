@@ -28,7 +28,7 @@ from helpdesk_agent.client import (
     make_client,
 )
 from helpdesk_agent.directory import Directory
-from helpdesk_agent.governance import EMAIL_RE, Approver, Gate, make_tty_approver
+from helpdesk_agent.governance import EMAIL_PATTERN, Approver, Gate, make_tty_approver
 
 PING_PROMPT = "Reply with the single word: pong"
 
@@ -180,7 +180,7 @@ def cmd_run(
     approver: Approver,
     out: TextIO,
 ) -> int:
-    if not EMAIL_RE.fullmatch(args.requester):
+    if not EMAIL_PATTERN.match(args.requester):
         out.write("--requester must be a lower-case address like name@example.test\n")
         return 2
     body = args.ticket if args.ticket is not None else args.ticket_file.read_text()
