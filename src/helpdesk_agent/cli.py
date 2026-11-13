@@ -53,7 +53,46 @@ def build_parser() -> argparse.ArgumentParser:
     body.add_argument("--ticket-file", type=Path, help="File holding the ticket text.")
     run.add_argument("--ticket-id", help="Defaults to a timestamp.")
     run.add_argument("--dry-run", action="store_true", help="Print the request, don't send.")
+
+    ev = sub.add_parser("eval-retrieval", help="Recall@3 and MRR per retriever (no key).")
+    ev.add_argument("--queries", type=Path, default=Path("evals/retrieval.jsonl"))
+    ev.add_argument(
+        "--embeddings",
+        action="store_true",
+        help="Also score local embeddings and hybrid (needs the optional fastembed install).",
+    )
+    ev.add_argument("--json", action="store_true", help="Print JSON instead of a table.")
     return parser
+
+
+def cmd_eval_retrieval(args: argparse.Namespace, out: TextIO) -> int:
+    from helpdesk_agent.retrieval import (
+        BM25Retriever,
+        EmbeddingRetriever,
+        FastEmbedEmbedder,
+        HybridRetriever,
+        load_runbooks,
+    )
+    from helpdesk_agent.retrieval_eval import format_table, load_queries, score
+
+    chunks = load_runbooks()
+    queries = load_queries(args.queries)
+    bm25 = BM25Retriever(chunks)
+    retrievers: list[Any] = [bm25]
+    if args.embeddings:
+        try:
+            embedder = FastEmbedEmbedder()
+        except ImportError:
+            out.write("fastembed isn't installed; see docs/dependency-reviews/fastembed.md\n")
+            return 2
+        dense = EmbeddingRetriever(chunks, embedder)
+        retrievers += [dense, HybridRetriever([bm25, dense])]
+    scores = [score(r, queries) for r in retrievers]
+    if args.json:
+        _print_json([s.to_dict() for s in scores], out)
+    else:
+        out.write(format_table(scores) + "\n")
+    return 0
 
 
 def _print_json(data: Any, out: TextIO) -> None:
@@ -134,6 +173,8 @@ def main(
         return cmd_ping(args, client_factory, out)
     if args.command == "run":
         return cmd_run(args, client_factory, approver or make_tty_approver(), out)
+    if args.command == "eval-retrieval":
+        return cmd_eval_retrieval(args, out)
     parser.print_help(out)
     return 0
 
