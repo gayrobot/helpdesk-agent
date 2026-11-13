@@ -29,18 +29,24 @@ def normalize(value: str) -> str:
     return " ".join(text.split()).casefold()
 
 
-def scripts_in(value: str) -> set[str]:
-    """The Unicode scripts of the letters in ``value``, after NFKC (e.g. {"LATIN"}).
+def letter_scripts(value: str) -> set[str]:
+    """The writing systems of the letters in ``value``, after NFKC (so fullwidth Latin
+    counts as Latin). Digits, punctuation and spaces don't count.
 
-    Used to reject names that mix scripts, such as "admins" spelled with a Cyrillic letter a.
-    The script is the first word of each letter's Unicode name, which is close enough to
-    the real Script property for the alphabets a look-alike attack would use.
+    The standard library has no Unicode script property, so this uses the first word of
+    each letter's Unicode name (LATIN, CYRILLIC, GREEK, ...). That is enough to catch a
+    look-alike letter from another alphabet hiding in a name.
     """
-    found = set()
-    for ch in unicodedata.normalize("NFKC", value):
-        if ch.isalpha():
-            found.add(unicodedata.name(ch, "UNKNOWN").split()[0])
-    return found
+    text = unicodedata.normalize("NFKC", value)
+    scripts = set()
+    for ch in text:
+        if unicodedata.category(ch).startswith("L"):
+            scripts.add(unicodedata.name(ch, "UNKNOWN").split(" ")[0])
+    return scripts
+
+
+def is_mixed_script(value: str) -> bool:
+    return len(letter_scripts(value)) > 1
 
 
 @dataclass
