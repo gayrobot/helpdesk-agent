@@ -19,7 +19,7 @@ Status: Phase 3 built against a mocked client; live calls start when API credits
 Requires Python 3.12, [uv](https://docs.astral.sh/uv/), [gitleaks](https://github.com/gitleaks/gitleaks), [pre-commit](https://pre-commit.com/) and the 1Password CLI.
 
 ```bash
-uv sync
+uv sync                       # add --extra embeddings for local embedding retrieval
 pre-commit install
 uv run pytest
 ```

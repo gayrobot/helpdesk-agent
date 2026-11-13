@@ -1,10 +1,15 @@
 import json
+import os
 
 import pytest
 
 from helpdesk_agent.audit import AuditLog
 from helpdesk_agent.directory import Directory
 from helpdesk_agent.governance import Gate, deny_all
+
+# Unit tests always use BM25, even where the optional embeddings extra is installed, so
+# they never download a model and give the same results everywhere.
+os.environ["HELPDESK_RETRIEVER"] = "bm25"
 
 
 class RecordingApprover:
