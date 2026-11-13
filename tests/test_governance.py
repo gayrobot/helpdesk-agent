@@ -257,3 +257,74 @@ def test_audit_lines_are_json_with_required_fields(make_gate, read_audit):
 def test_audit_truncates_long_values(make_gate, read_audit):
     make_gate().execute("escalate", {"summary": "x" * 1500})
     assert len(read_audit()[-1]["args"]["summary"]) < 400
+
+
+# ---------------------------------------------------------------- Phase 3 rules
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "Jamie@example.test",
+        " jamie@example.test",
+        "jamie@example.test ",
+        "jamie@example.test​",
+        "jamie@example.com",
+        "jamie@example.test.evil.test",
+        "j\u0430mie@example.test",  # Cyrillic a
+        "jamie+admin@example.test",
+        "jamie@EXAMPLE.test",
+    ],
+)
+def test_email_must_match_exact_format(make_gate, email):
+    outcome = make_gate().execute("lookup_user", {"email": email})
+    assert outcome.decision is Decision.INVALID_INPUT
+
+
+@pytest.mark.parametrize(
+    "group",
+    [
+        "\u0430dmins",  # Cyrillic a + Latin
+        "figma-us\u0435rs",  # Cyrillic e in a harmless-looking group
+        "dom\u03b1in-admins",  # Greek alpha
+    ],
+)
+def test_mixed_script_group_names_rejected(make_gate, directory, group):
+    approver = RecordingApprover(answer=True)
+    outcome = make_gate(approver).execute("add_to_group", {"email": JAMIE, "group": group})
+    assert outcome.decision is Decision.INVALID_INPUT
+    assert approver.proposals == []
+
+
+def test_group_whitespace_is_collapsed_before_the_deny_check(make_gate):
+    approver = RecordingApprover(answer=True)
+    outcome = make_gate(approver).execute(
+        "add_to_group", {"email": JAMIE, "group": "  domain-admins\t "}
+    )
+    assert outcome.decision is Decision.DENIED_BY_POLICY
+    assert approver.proposals == []
+
+
+def test_requester_comes_from_the_harness(directory, audit_path, tmp_path, read_audit):
+    approver = RecordingApprover(answer=False)
+    gate = Gate(
+        directory=directory,
+        approver=approver,
+        audit=AuditLog(audit_path),
+        ticket_id="T-REQ",
+        escalation_dir=tmp_path / "esc",
+        requester="eli.novak@example.test",
+    )
+    gate.execute("reset_mfa", {"email": JAMIE})
+    proposal = approver.proposals[0]
+    assert proposal.requester == "eli.novak@example.test"
+    assert proposal.target == JAMIE
+    assert proposal.on_behalf_of_someone_else
+    assert read_audit()[-1]["requester"] == "eli.novak@example.test"
+
+
+def test_no_tool_accepts_a_requester_argument():
+    from helpdesk_agent.tools import TOOLS
+
+    for spec in TOOLS.values():
+        assert "requester" not in spec.input_schema["properties"]

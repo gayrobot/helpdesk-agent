@@ -16,6 +16,7 @@ code, not prompt.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -24,7 +25,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from helpdesk_agent.audit import AuditLog
-from helpdesk_agent.directory import Directory
+from helpdesk_agent.directory import Directory, scripts_in
 from helpdesk_agent.tools import (
     TOOLS,
     PolicyDenied,
@@ -36,6 +37,10 @@ from helpdesk_agent.tools import (
 )
 
 DEFAULT_ESCALATION_DIR = Path("logs/escalations")
+
+# Exact format for every email argument. No normalizing: anything else is rejected, so a
+# padded, upper-case or look-alike address never reaches a handler.
+EMAIL_RE = re.compile(r"^[a-z0-9._-]+@example\.test$")
 
 DENIED_BY_HUMAN = (
     "Denied by human operator. Do not retry this action. Tell the requester it was not "
@@ -59,6 +64,16 @@ class Proposal:
     tool: str
     args: dict[str, Any]
     description: str
+    requester: str = "unknown"
+
+    @property
+    def target(self) -> str | None:
+        email = self.args.get("email")
+        return email if isinstance(email, str) else None
+
+    @property
+    def on_behalf_of_someone_else(self) -> bool:
+        return self.target is not None and self.target != self.requester
 
 
 @dataclass(frozen=True)
@@ -94,11 +109,21 @@ def make_tty_approver(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) ->
             stdout.flush()
             return False
         args = ", ".join(f"{k}={display(v)!r}" for k, v in proposal.args.items())
+        target = display(proposal.target) if proposal.target else "-"
+        flag = ""
+        if proposal.on_behalf_of_someone_else:
+            flag = (
+                "!!!!!!  REQUESTER IS NOT THE TARGET: confirm the requester may ask for this  "
+                "!!!!!!\n"
+            )
         stdout.write(
             "\n"
             "──────── approval required ────────\n"
-            f"Tool:    {proposal.tool}({args})\n"
-            f"Effect:  {proposal.description}\n"
+            f"Tool:      {proposal.tool}({args})\n"
+            f"Effect:    {display(proposal.description)}\n"
+            f"Requester: {display(proposal.requester)}\n"
+            f"Target:    {target}\n"
+            f"{flag}"
             "Type y to approve, anything else to deny: "
         )
         stdout.flush()
@@ -137,6 +162,10 @@ def validate_args(spec: ToolSpec, args: Any) -> str | None:
             limit = prop.get("maxLength")
             if limit is not None and len(value) > limit:
                 return f"{key} is longer than {limit} characters."
+            if key == "email" and not EMAIL_RE.fullmatch(value):
+                return "email must be a lower-case address like name@example.test."
+            if key == "group" and len(scripts_in(value)) > 1:
+                return "group mixes writing systems; use the exact group name."
     return None
 
 
@@ -151,11 +180,17 @@ class Gate:
         audit: AuditLog,
         ticket_id: str,
         escalation_dir: Path = DEFAULT_ESCALATION_DIR,
+        requester: str = "unknown",
     ) -> None:
+        # The requester comes from the harness (the CLI or the eval runner), never from the
+        # model: no tool takes it as an argument.
         self.approver = approver
         self.audit = audit
         self.ctx = ToolContext(
-            directory=directory, escalation_dir=escalation_dir, ticket_id=ticket_id
+            directory=directory,
+            escalation_dir=escalation_dir,
+            ticket_id=ticket_id,
+            requester=requester,
         )
 
     def execute(self, name: str, args: Any) -> Outcome:
@@ -185,7 +220,9 @@ class Gate:
         if spec.kind is ToolKind.WRITE:
             try:
                 assert spec.describe is not None  # noqa: S101 (every WRITE tool has one)
-                proposal = Proposal(name, dict(args), spec.describe(self.ctx, args))
+                proposal = Proposal(
+                    name, dict(args), spec.describe(self.ctx, args), self.ctx.requester
+                )
                 approved = self.approver(proposal) is True
             except Exception as exc:
                 return self._internal_error(name, spec, args, exc)
@@ -199,6 +236,7 @@ class Gate:
             self.audit.record(
                 "write_approved",
                 ticket_id=self.ctx.ticket_id,
+                requester=self.ctx.requester,
                 tool=name,
                 args=args,
                 effect=proposal.description,
@@ -243,6 +281,7 @@ class Gate:
         self.audit.record(
             "tool_call",
             ticket_id=self.ctx.ticket_id,
+            requester=self.ctx.requester,
             tool=name,
             kind=spec.kind.value if spec else None,
             args=args if isinstance(args, dict) else repr(args),

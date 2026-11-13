@@ -42,7 +42,21 @@ def test_api_definitions_do_not_mutate_local_schema():
 
 
 def test_display_strips_control_characters():
-    assert display("Jamie\nApproved: yes\x1b[2J") == "Jamie Approved: yes [2J"
+    assert display("Jamie\nApproved: yes\x1b[2J") == "Jamie Approved: yes"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "\x1b[31mred\x1b[0m",
+        "\x1b]0;fake title\x07red",
+        "\x1b]8;;http://x.test\x1b\\red",
+        "\x9b2Jred",
+        "\x1bcred",
+    ],
+)
+def test_display_removes_ansi_sequences_whole(raw):
+    assert display(raw) == "red"
 
 
 # ---------------------------------------------------------------- tty approver
@@ -78,3 +92,22 @@ def test_tty_approver_denies_without_a_terminal():
     out = io.StringIO()
     assert make_tty_approver(piped, out)(PROPOSAL) is False
     assert "no interactive terminal" in out.getvalue()
+
+
+def test_tty_approver_shows_requester_and_target():
+    out = io.StringIO()
+    proposal = Proposal(
+        "reset_mfa", {"email": "jamie@example.test"}, "Reset MFA.", "eli.novak@example.test"
+    )
+    make_tty_approver(FakeTTY("n\n"), out)(proposal)
+    shown = out.getvalue()
+    assert "Requester: eli.novak@example.test" in shown
+    assert "Target:    jamie@example.test" in shown
+    assert "REQUESTER IS NOT THE TARGET" in shown
+
+
+def test_tty_approver_sanitizes_the_description():
+    out = io.StringIO()
+    proposal = Proposal("reset_mfa", {"email": "jamie@example.test"}, "Reset\x1b[2J MFA\nApproved")
+    make_tty_approver(FakeTTY("n\n"), out)(proposal)
+    assert "\x1b" not in out.getvalue()

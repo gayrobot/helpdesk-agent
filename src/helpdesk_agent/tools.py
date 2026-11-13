@@ -14,6 +14,7 @@ Each tool has three parts:
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -44,6 +45,7 @@ class ToolContext:
     directory: Directory
     escalation_dir: Path
     ticket_id: str
+    requester: str = "unknown"
 
 
 Result = tuple[dict[str, Any], str]
@@ -91,9 +93,23 @@ EMAIL = {
 }
 
 
+# ANSI/VT escape sequences: CSI (ESC [ ... or the 8-bit CSI), OSC (ESC ] ... BEL or ST),
+# and two-character ESC sequences. Removed whole, so no "[2J" residue reaches the terminal.
+_ANSI = re.compile(
+    r"(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]"
+    r"|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?"
+    r"|\x1b[ -~]"
+)
+
+
 def display(value: Any) -> str:
-    """Make a directory value safe to print at the approval prompt (no control chars)."""
-    text = str(value)
+    """Make a value safe to print at the approval prompt.
+
+    ANSI escape sequences are removed, and every other control or format character is
+    replaced with a space, so text from the model, a ticket or a tool result can't move
+    the cursor, clear the screen or fake a line of the prompt.
+    """
+    text = _ANSI.sub("", str(value))
     return "".join(ch if unicodedata.category(ch)[0] != "C" else " " for ch in text)
 
 
