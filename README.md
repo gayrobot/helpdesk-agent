@@ -4,7 +4,7 @@ A small, governed IT helpdesk agent on the Claude API. It answers IT requests fo
 
 **All data is synthetic.** No real people, credentials or company data.
 
-Status: Phase 1 (repo setup and secret hygiene). See [docs/plan.md](docs/plan.md). Manual, owner-only steps are in [docs/operator-checklist.md](docs/operator-checklist.md).
+Status: Phase 3 built against a mocked client; live calls start when API credits arrive. See [docs/plan.md](docs/plan.md). Manual, owner-only steps are in [docs/operator-checklist.md](docs/operator-checklist.md).
 
 ## Governance model
 
@@ -27,8 +27,14 @@ uv run pytest
 The API key is never stored in the repo. `.env.tpl` holds a 1Password reference, and live commands run through `op run`:
 
 ```bash
-op run --env-file=.env.tpl -- uv run helpdesk-agent --help
+op run --env-file=.env.tpl -- uv run helpdesk-agent ping
 ```
+
+```bash
+op run --env-file=.env.tpl -- uv run helpdesk-agent run --requester jamie@example.test --ticket "Lost my phone, please reset my MFA"
+```
+
+`--dry-run` on either command prints the request without sending it and needs no key. Each model call is logged to `logs/calls.jsonl` (model, request ID, tokens, cost, latency, stop reason) and each tool call to `logs/audit.jsonl`.
 
 ## License
 
