@@ -4,19 +4,19 @@ Steps that only Skylar can do by hand, in order. Claude Code and CI never do the
 
 Each item says **where** it happens and **when**. Tick the box in a PR when it's done.
 
-Checked on 2026-11-13. Facts marked "verified" came from read-only `gh api` calls and public DNS that day. They can drift, so re-run the check commands before relying on them.
+Checked on 2026-11-13. Facts marked "verified" came from `gh api` calls and read-only Cloudflare API calls that day. They can drift, so re-run the check commands before relying on them.
 
 ## Who does what
 
 | Actor | Can do | Never does |
 | --- | --- | --- |
 | Skylar | Everything below: Console, 1Password, GitHub settings, Cloudflare, live `op run` commands, merging PRs, typing `y` at the write gate | — |
-| Claude Code | Code, tests, docs, PRs, read-only `gh api` checks | Read `.env*`, run `op read` / `op item get` / `op inject`, run anything through `op run`, change repo settings, deploy |
+| Claude Code | Code, tests, docs, PRs, read-only `gh api` checks | Read `.env*`, run `op read` / `op item get` / `op inject`, run anything through `op run`, change repo settings unless Skylar asks in the session, deploy |
 | CI | Lint, format, unit tests (mocked client, `ANTHROPIC_API_KEY=""`), gitleaks | Call the real API |
 
-## 1. Before the credits land (by 2026-11-17)
+## 1. When the credits land (around 2026-11-18)
 
-API credits arrive around **2026-11-18**. Get the account ready the day before so the Phase 3 live steps can run the same day.
+None of this can start before the credits are on the account. Do it the day they arrive, before the Phase 3 live steps. Until then, everything is built against the mocked client.
 
 - [ ] **Create a dedicated workspace.** Console UI (console.anthropic.com → Settings → Workspaces). Name it e.g. `helpdesk-agent-dev`. Keep it separate from anything else on the account so spend and keys are scoped.
 - [ ] **Set a spend limit on that workspace.** Console UI (workspace → Limits). Pick a monthly cap that would hurt to exceed but covers Phase 5 (50–100 tickets × a few runs, Haiku while developing). Turn on email alerts below the cap if the Console offers them.
@@ -30,7 +30,7 @@ API credits arrive around **2026-11-18**. Get the account ready the day before s
   ```
 
   `.env.tpl` already points at `op://Private/Anthropic helpdesk-agent-dev/credential` (verified 2026-11-13). If you rename the item, update `.env.tpl` in a PR.
-- [ ] **Set a 90-day rotation reminder.** Calendar or 1Password (item → add an expiry date, which 1Password Watchtower then flags). Date = key creation + 90 days; a key made on 2026-11-17 is due on **2027-02-15**.
+- [ ] **Set a 90-day rotation reminder.** Calendar or 1Password (item → add an expiry date, which 1Password Watchtower then flags). Date = key creation + 90 days; a key made on 2026-11-18 is due on **2027-02-16**.
 - [ ] **Confirm the local tools are installed and unlocked.** Terminal: `op --version`, `op whoami` (sign in via the 1Password app integration), `gitleaks version`, `pre-commit install` in your main checkout.
 
 **Console UI:** workspace, spend limit, rate limits, key creation.
@@ -38,7 +38,7 @@ API credits arrive around **2026-11-18**. Get the account ready the day before s
 
 ## 2. GitHub hygiene
 
-Verified with read-only `gh api` calls on 2026-11-13 against `gayrobot/helpdesk-agent` (public). Nothing was changed. Settings live at GitHub → repo → Settings; change them yourself in the UI.
+Checked with `gh api` on 2026-11-13 against `gayrobot/helpdesk-agent` (public). At Skylar's request, Claude turned on Dependabot alerts and required SHA pinning that day; everything else is unchanged. Settings live at GitHub → repo → Settings.
 
 ### Already in place
 
@@ -48,12 +48,12 @@ Verified with read-only `gh api` calls on 2026-11-13 against `gayrobot/helpdesk-
 - [x] **CODEOWNERS:** `.github/CODEOWNERS` assigns `* @gayrobot`; GitHub reports no errors in it.
 - [x] **Actions:** default `GITHUB_TOKEN` permission is read-only, and Actions can't approve PRs.
 - [x] **Merge settings:** squash only, branches deleted after merge, auto-merge off.
+- [x] **Dependabot alerts:** turned on 2026-11-13 (`vulnerability-alerts` returns 204). Alerts only; no PRs are opened.
+- [x] **Require actions pinned to full SHAs:** turned on 2026-11-13 (`sha_pinning_required: true`). The workflows already pin by SHA, so this enforces what's there. A new action added by tag will fail until it's pinned.
 
 ### Missing or worth deciding
 
-- [ ] **Dependabot alerts: off** (`vulnerability-alerts` returns 404). Settings → Code security → Dependabot alerts → Enable. Alerts only; no PRs are opened. Recommended.
 - [ ] **Dependabot security updates: off.** Optional. If you turn it on, its PRs still have to respect the exact pins, `uv.lock` and the 7-day cooldown, so review them like any dependency change (section 5).
-- [ ] **Require actions pinned to full SHAs: off** (`sha_pinning_required: false`). Settings → Actions → General → "Require actions to be pinned to a full-length commit SHA". The workflows already pin by SHA, so turning it on only enforces what's there. Recommended.
 - [ ] **Allowed actions: all.** Optional: restrict to actions from GitHub plus `astral-sh/setup-uv` and `gitleaks/gitleaks-action`.
 - [ ] **Non-provider secret patterns and validity checks: off.** Settings → Code security → Secret scanning. Optional extras on a public repo.
 - [ ] **Code-owner review not required** (`require_code_owner_reviews: false`, 0 approvals). That's deliberate for a solo repo: GitHub doesn't let you approve your own PR, so requiring it would block every merge. Leave as is unless a second reviewer joins.
@@ -121,32 +121,30 @@ The subcommand names below follow `docs/plan.md`; the Phase 3 PR may change flag
 
 ## 4. Phase 6: publish the write-up on damiano.dev
 
-### What's known (2026-11-13)
+### How the site is served (checked 2026-11-13, read-only Cloudflare API)
 
-- `damiano.dev` uses Cloudflare nameservers (`bristol`, `merlin`.ns.cloudflare.com) and is proxied by Cloudflare (`server: cloudflare`, Cloudflare anycast IPs). So DNS is on Cloudflare.
-- What serves the site behind the proxy (Pages, Workers static assets, or another origin) couldn't be told from outside.
-- The Cloudflare plugin in Claude Code isn't authorized yet, so its account tools couldn't be used. To let Claude look up the setup read-only later, authorize it via `/mcp` in a terminal Claude Code session. `wrangler` isn't installed on this machine.
+- The `damiano.dev` zone is on Cloudflare (Free plan). `damiano.dev` and `www.damiano.dev` are **Workers custom domains** bound to the Worker `damiano-dev`. There's no Pages project.
+- The Worker serves a static **Astro** build with Workers static assets (`assets.directory = ./dist`, no server code). Source: the public repo `gayrobot/damiano.dev`, which has `src/content/projects/` and `src/pages/projects/`.
+- **Preview:** `.github/workflows/preview.yml` in that repo runs on every PR that touches `src/**` and uploads a Worker version with the alias `pr-<N>`. It comments the preview URL on the PR. Nothing is promoted.
+- **Production:** merging to `main` deploys (the deploy job in its `ci.yml`). The Worker also has a Workers Builds trigger on `main` (`npm run build`, then `npx wrangler deploy`). See the follow-up below.
 
-The steps below are generic. Pick the branch that matches what you find in step 1.
+So publishing the write-up is a content PR in the site repo. It needs no new DNS record, route, Worker, Pages project or `wrangler login`.
 
 ### Steps
 
-- [ ] **Find out how the site is served.** Cloudflare dashboard → Workers & Pages. Look for a project bound to `damiano.dev` (Custom domains tab). Note whether it's a Pages project or a Worker, and whether it deploys from a Git repo or by direct upload.
-- [ ] **Decide the URL.** A path on the existing site (e.g. `damiano.dev/projects/helpdesk-agent`) is simplest: it goes into the site's own repo and deploys with it, with no DNS change. A subdomain (e.g. `helpdesk-agent.damiano.dev`) needs its own project and a DNS record.
-- [ ] **Review the write-up for data.** Real eval numbers and cost are fine. No key, no request IDs you'd rather not publish, no real names, nothing from employers, only `example.test` data in screenshots and transcripts.
-- [ ] **Log in to Cloudflare from the CLI**, if deploying from your machine. Terminal, Skylar only: `npx wrangler@<pinned version> login` (opens a browser OAuth flow). Alternatively, create a scoped API token in the dashboard (My Profile → API Tokens, template "Edit Cloudflare Workers", limited to this account and zone) and keep it in 1Password like the Anthropic key.
-- [ ] **Preview deploy first.**
-  - *Pages, Git-connected:* push the write-up on a branch of the site's repo; Pages builds a preview at `<branch>.<project>.pages.dev`.
-  - *Pages, direct upload:* `npx wrangler pages deploy <build-dir> --project-name <project> --branch preview`.
-  - *Workers static assets:* `npx wrangler versions upload` gives a preview URL without moving production traffic (needs preview URLs enabled on the Worker).
-- [ ] **Check the preview** on desktop and phone: links, images, numbers match `evals/results/`.
-- [ ] **Promote to production.**
-  - *Pages:* merge to the production branch, or `wrangler pages deploy` with the production branch.
-  - *Workers:* `npx wrangler versions deploy` (or `wrangler deploy`).
-- [ ] **Route or DNS, subdomain only.** Pages: project → Custom domains → add `helpdesk-agent.damiano.dev` (Cloudflare adds the proxied CNAME). Workers: Settings → Domains & Routes → add a custom domain. A path on the existing site needs neither.
-- [ ] **Link the page from the repo README** in a PR once it's live.
+- [ ] **Draft the page.** Claude can do this, in a PR to `gayrobot/damiano.dev`: a new entry under `src/content/projects/` (e.g. `helpdesk-agent.md`) following the existing entries. The URL becomes `damiano.dev/projects/<slug>`. Content: problem, architecture, governance rules, real eval numbers, cost per ticket, retrieval comparison, what fails and why. It waits for the Phase 5 live numbers.
+- [ ] **Review the write-up for data.** GitHub PR, Skylar. Real eval numbers and cost are fine. No key, no request IDs, no real names, nothing from employers, only `example.test` data in screenshots and transcripts. The site's `npm run check:privacy` and `lint:content` checks help but don't replace reading it.
+- [ ] **Check the preview.** Browser, Skylar: open the `pr-<N>` URL that the preview workflow comments on the PR, on desktop and phone. Check links, images, and that the numbers match `evals/results/`.
+- [ ] **Merge to publish.** GitHub UI, Skylar. Merging to `main` deploys to production. Then check `https://damiano.dev/projects/<slug>` live.
+- [ ] **Link the page from this repo's README** in a PR once it's live.
 
-Claude may draft the write-up and its build files in a PR, but doesn't run `wrangler`, create Cloudflare resources or deploy.
+The Cloudflare dashboard and `wrangler login` are needed only if the preview workflow fails for a credentials reason. Its token lives in the site repo's `preview` GitHub environment as `CLOUDFLARE_API_TOKEN`; if it expired, Skylar makes a new one in the Cloudflare dashboard (My Profile → API Tokens, Workers edit, this account only) and replaces the environment secret.
+
+Claude may draft the page and open the PR, but doesn't run `wrangler`, create Cloudflare resources or merge.
+
+### Follow-up found while checking
+
+- [ ] **Two production deploy paths on `main`.** Both the site's GitHub Actions deploy job and the Cloudflare Workers Builds trigger deploy on every push to `main`. Recent versions were uploaded by `wrangler` from Actions. Decide which one you want, then disconnect the other in the Cloudflare dashboard (Workers & Pages → `damiano-dev` → Settings → Build) or remove the job, so one merge doesn't deploy twice. This belongs to the site repo, not this one.
 
 ## 5. Dependency reviews (when a phase adds one)
 
@@ -158,7 +156,7 @@ CLAUDE.md requires a short review before any new dependency. Claude writes the r
 
 ## 6. Ongoing and incident steps
 
-- [ ] **Rotate the key every 90 days** (first due 2027-02-15 if made on 2026-11-17). Console: create a new workspace key. 1Password: replace the `credential` field in the same item, so `.env.tpl` doesn't change. Run the `op run ... echo key present` check and `helpdesk-agent ping`. Console: delete the old key. Move the reminder forward 90 days.
+- [ ] **Rotate the key every 90 days** (first due 2027-02-16 if made on 2026-11-18). Console: create a new workspace key. 1Password: replace the `credential` field in the same item, so `.env.tpl` doesn't change. Run the `op run ... echo key present` check and `helpdesk-agent ping`. Console: delete the old key. Move the reminder forward 90 days.
 - [ ] **If the key leaks** (GitHub push-protection alert, gitleaks hit, Anthropic notice, pasted somewhere by mistake):
   1. Console UI → workspace → API keys → **delete the key now**. Don't wait to investigate.
   2. Console UI → Usage: look for calls you didn't make; lower the spend limit if needed.
