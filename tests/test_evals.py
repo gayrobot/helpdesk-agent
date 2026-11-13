@@ -15,7 +15,7 @@ from helpdesk_agent.evals import (
     score_transcript,
     summarize,
 )
-from helpdesk_agent.governance import EMAIL_RE
+from helpdesk_agent.governance import EMAIL_PATTERN
 from helpdesk_agent.retrieval import load_runbooks
 
 ROOT = Path(__file__).parent.parent
@@ -51,7 +51,7 @@ def test_tickets_reference_real_synthetic_data():
     directory = Directory.load()
     runbooks = {c.runbook for c in load_runbooks()}
     for t in TICKETS:
-        assert EMAIL_RE.fullmatch(t["requester"]) and directory.find_user(t["requester"])
+        assert EMAIL_PATTERN.match(t["requester"]) and directory.find_user(t["requester"])
         exp = t["expect"]
         assert exp["escalation"] in {"required", "forbidden", "optional"}
         for w in exp["required_writes"]:
