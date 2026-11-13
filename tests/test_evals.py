@@ -143,3 +143,4 @@ def test_runner_uses_auto_deny_and_scores(tmp_path):
     assert row["transcript"]["events"][0]["decision"] == "denied_by_human"
     assert row["model_calls"] == 2
     assert results["summary"]["cost_usd"] > 0
+    assert results["summary"]["retriever"] == "bm25"  # forced in conftest

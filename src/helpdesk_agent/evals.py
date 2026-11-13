@@ -32,6 +32,7 @@ from helpdesk_agent.audit import AuditLog
 from helpdesk_agent.client import DEFAULT_CALL_LOG, CallLog, MessagesClient, ModelCaller
 from helpdesk_agent.directory import Directory
 from helpdesk_agent.governance import Decision, Gate, deny_all
+from helpdesk_agent.retrieval import default_retriever
 from helpdesk_agent.tools import TOOLS, ToolKind
 
 DEFAULT_TICKETS = Path("evals/tickets.jsonl")
@@ -223,6 +224,7 @@ def run_tickets(
     priced = [r["cost_usd"] for r in rows if r["cost_usd"] is not None]
     summary["cost_usd"] = round(sum(priced), 6)
     summary["latency_ms_total"] = sum(r["latency_ms"] for r in rows)
+    summary["retriever"] = default_retriever().name  # hybrid or bm25, see retrieval.py
     return {"summary": summary, "tickets": rows}
 
 
