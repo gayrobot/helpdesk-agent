@@ -1,0 +1,42 @@
+[project]
+name = "helpdesk-agent"
+version = "0.1.0"
+description = "A governed IT helpdesk agent on the Claude API. Synthetic data only."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+# Exact pins only. New dependencies need a short review first (see CLAUDE.md).
+dependencies = [
+    "anthropic==2.6.0",
+]
+
+[project.scripts]
+helpdesk-agent = "helpdesk_agent.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+    "ruff==0.17.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Supply-chain cooldown: never resolve a release younger than a week.
+exclude-newer = "7 days"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

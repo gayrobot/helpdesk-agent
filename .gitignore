@@ -1,0 +1,25 @@
+# Secrets: the key only ever reaches the process via `op run --env-file=.env.tpl`.
+.env
+.env.*
+!.env.tpl
+
+# Audit and call logs (may hold ticket text; never committed)
+logs/
+*.jsonl
+# ...except the eval ticket set, which is synthetic and versioned
+!evals/**/*.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
