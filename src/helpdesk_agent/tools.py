@@ -157,7 +157,8 @@ def _list_devices(ctx: ToolContext, args: dict[str, Any]) -> Result:
 def _search_runbooks(_ctx: ToolContext, args: dict[str, Any]) -> Result:
     from helpdesk_agent.retrieval import TOP_K, default_retriever
 
-    hits = default_retriever().search(args["query"], TOP_K)
+    retriever = default_retriever()
+    hits = retriever.search(args["query"], TOP_K)
     results = [
         {
             "runbook": chunk.runbook,
@@ -168,7 +169,7 @@ def _search_runbooks(_ctx: ToolContext, args: dict[str, Any]) -> Result:
         for chunk, _score in hits
     ]
     summary = ", ".join(f"{c.runbook}#{c.section}" for c, _ in hits) or "no results"
-    return {"query": args["query"], "results": results}, summary
+    return {"query": args["query"], "results": results}, f"{retriever.name}: {summary}"
 
 
 # ---------------------------------------------------------------- reset_mfa

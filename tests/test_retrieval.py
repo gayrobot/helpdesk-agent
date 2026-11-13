@@ -114,3 +114,68 @@ def test_search_runbooks_tool_through_the_gate(make_gate, read_audit):
     assert len(body["results"]) == 3
     assert body["results"][0]["runbook"] == "okta-verify-reenrollment"
     assert read_audit()[-1]["tool"] == "search_runbooks"
+
+
+# ---------------------------------------------------------------- pinned model
+
+
+def _write_model(tmp_path, files):
+    import hashlib
+
+    pins = {}
+    for name, body in files.items():
+        (tmp_path / name).write_bytes(body)
+        pins[name] = hashlib.sha256(body).hexdigest()
+    return pins
+
+
+def test_verify_model_dir_accepts_matching_files(tmp_path):
+    from helpdesk_agent.retrieval import verify_model_dir
+
+    pins = _write_model(tmp_path, {"model.onnx": b"weights", "vocab.txt": b"a\nb"})
+    verify_model_dir(tmp_path, pins)
+
+
+def test_verify_model_dir_rejects_tampered_file(tmp_path):
+    from helpdesk_agent.retrieval import ModelIntegrityError, verify_model_dir
+
+    pins = _write_model(tmp_path, {"model.onnx": b"weights"})
+    (tmp_path / "model.onnx").write_bytes(b"weights, but evil")
+    with pytest.raises(ModelIntegrityError):
+        verify_model_dir(tmp_path, pins)
+
+
+def test_verify_model_dir_rejects_missing_file(tmp_path):
+    from helpdesk_agent.retrieval import ModelIntegrityError, verify_model_dir
+
+    with pytest.raises(ModelIntegrityError):
+        verify_model_dir(tmp_path, {"model.onnx": "0" * 64})
+
+
+def test_every_model_file_is_pinned_to_a_full_hash():
+    from helpdesk_agent.retrieval import MODEL_FILES, MODEL_REVISION
+
+    assert len(MODEL_REVISION) == 40
+    assert "model_optimized.onnx" in MODEL_FILES
+    assert all(len(h) == 64 for h in MODEL_FILES.values())
+
+
+def test_default_retriever_falls_back_to_bm25_without_the_extra(monkeypatch):
+    import builtins
+
+    from helpdesk_agent import retrieval
+
+    real_import = builtins.__import__
+
+    def no_fastembed(name, *args, **kwargs):
+        if name == "fastembed":
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setenv(retrieval.RETRIEVER_ENV, "auto")
+    monkeypatch.setattr(builtins, "__import__", no_fastembed)
+    retrieval.default_retriever.cache_clear()
+    try:
+        assert retrieval.default_retriever().name == "bm25"
+    finally:
+        retrieval.default_retriever.cache_clear()
