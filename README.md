@@ -34,7 +34,20 @@ op run --env-file=.env.tpl -- uv run helpdesk-agent ping
 op run --env-file=.env.tpl -- uv run helpdesk-agent run --requester jamie@example.test --ticket "Lost my phone, please reset my MFA"
 ```
 
-`--dry-run` on either command prints the request without sending it and needs no key. Each model call is logged to `logs/calls.jsonl` (model, request ID, tokens, cost, latency, stop reason) and each tool call to `logs/audit.jsonl`.
+Key-free checks:
+
+```bash
+uv run helpdesk-agent eval-retrieval   # recall@3 and MRR per retriever
+uv run helpdesk-agent score            # scorer against hand-labelled transcripts
+```
+
+The full eval (62 synthetic tickets, every write auto-denied) is live:
+
+```bash
+op run --env-file=.env.tpl -- uv run helpdesk-agent eval
+```
+
+`--dry-run` on the live commands prints what would be sent and needs no key. Each model call is logged to `logs/calls.jsonl` (model, request ID, tokens, cost, latency, stop reason) and each tool call to `logs/audit.jsonl`.
 
 ## License
 

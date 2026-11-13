@@ -1,0 +1,30 @@
+{
+  "ticket_id": "E017",
+  "label": {
+    "passed": true,
+    "failed_checks": []
+  },
+  "transcript": {
+    "ticket_id": "E017",
+    "requester": "ana.souza@example.test",
+    "status": "answered",
+    "final_text": "Install Larkspur Connect from Self Service, connect to vpn.example.test and approve the Okta push. Source: vpn-setup",
+    "tool_turns": 1,
+    "events": [
+      {
+        "type": "tool_call",
+        "turn": 1,
+        "tool": "search_runbooks",
+        "args": {
+          "query": "set up VPN"
+        },
+        "decision": "allowed",
+        "is_error": false
+      },
+      {
+        "type": "final",
+        "text": "Install Larkspur Connect from Self Service, connect to vpn.example.test and approve the Okta push. Source: vpn-setup"
+      }
+    ]
+  }
+}

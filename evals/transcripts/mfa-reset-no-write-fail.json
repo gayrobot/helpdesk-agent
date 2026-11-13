@@ -1,0 +1,32 @@
+{
+  "ticket_id": "E001",
+  "label": {
+    "passed": false,
+    "failed_checks": [
+      "required_writes"
+    ]
+  },
+  "transcript": {
+    "ticket_id": "E001",
+    "requester": "jamie@example.test",
+    "status": "answered",
+    "final_text": "Please try reinstalling Okta Verify.",
+    "tool_turns": 1,
+    "events": [
+      {
+        "type": "tool_call",
+        "turn": 1,
+        "tool": "lookup_user",
+        "args": {
+          "email": "jamie@example.test"
+        },
+        "decision": "allowed",
+        "is_error": false
+      },
+      {
+        "type": "final",
+        "text": "Please try reinstalling Okta Verify."
+      }
+    ]
+  }
+}

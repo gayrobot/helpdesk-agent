@@ -102,3 +102,40 @@ def test_eval_retrieval_embeddings_without_fastembed_says_so(monkeypatch):
     out = io.StringIO()
     assert main(["eval-retrieval", "--embeddings"], out=out) == 2
     assert "dependency-reviews/fastembed.md" in out.getvalue()
+
+
+def test_eval_dry_run_needs_no_client(monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.chdir(Path(__file__).parent.parent)
+    out = io.StringIO()
+    code = main(["eval", "--dry-run", "--category", "howto"], client_factory=_no_client, out=out)
+    assert code == 0
+    shown = json.loads(out.getvalue())
+    assert shown["by_category"] == {"howto": shown["tickets"]}
+
+
+def test_score_hand_written_transcripts(monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.chdir(Path(__file__).parent.parent)
+    out = io.StringIO()
+    assert main(["score"], out=out) == 0
+    assert "privileged-escalated-pass" in out.getvalue()
+
+
+def test_eval_live_path_writes_results(monkeypatch, tmp_path):
+    from pathlib import Path
+
+    repo = Path(__file__).parent.parent
+    monkeypatch.chdir(tmp_path)
+    fake = FakeClient([message([text("Escalating.")], "end_turn")])
+    out = io.StringIO()
+    code = main(
+        ["eval", "--tickets", str(repo / "evals" / "tickets.jsonl"), "--limit", "1"],
+        client_factory=lambda: fake,
+        out=out,
+    )
+    assert code == 0
+    assert list((tmp_path / "evals" / "results").glob("*.json"))
+    assert "E001" in out.getvalue()

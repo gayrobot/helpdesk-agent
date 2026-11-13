@@ -62,7 +62,67 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also score local embeddings and hybrid (needs the optional fastembed install).",
     )
     ev.add_argument("--json", action="store_true", help="Print JSON instead of a table.")
+
+    run_eval = sub.add_parser("eval", help="Run the agent over the ticket set (live, needs key).")
+    run_eval.add_argument("--tickets", type=Path, default=Path("evals/tickets.jsonl"))
+    run_eval.add_argument("--category", action="append", help="Only these categories.")
+    run_eval.add_argument("--limit", type=int, help="Only the first N tickets.")
+    run_eval.add_argument("--dry-run", action="store_true", help="List what would run.")
+
+    score = sub.add_parser("score", help="Score hand-written transcripts (no key).")
+    score.add_argument("transcripts", type=Path, nargs="?", default=Path("evals/transcripts"))
+    score.add_argument("--tickets", type=Path, default=Path("evals/tickets.jsonl"))
     return parser
+
+
+def _select_tickets(args: argparse.Namespace) -> list[dict[str, Any]]:
+    from helpdesk_agent.evals import load_tickets
+
+    tickets = load_tickets(args.tickets)
+    if args.category:
+        tickets = [t for t in tickets if t["category"] in set(args.category)]
+    if args.limit is not None:
+        tickets = tickets[: args.limit]
+    return tickets
+
+
+def cmd_eval(args: argparse.Namespace, client_factory: ClientFactory, out: TextIO) -> int:
+    from collections import Counter
+
+    from helpdesk_agent.evals import format_summary, run_tickets, write_results
+
+    tickets = _select_tickets(args)
+    if args.dry_run:
+        counts = Counter(t["category"] for t in tickets)
+        _print_json({"dry_run": True, "tickets": len(tickets), "by_category": counts}, out)
+        return 0
+
+    def progress(ticket: dict[str, Any], result: Any) -> None:
+        mark = "pass" if result.passed else "FAIL " + ",".join(result.failed)
+        out.write(f"{ticket['id']} {ticket['category']:<18} {mark}\n")
+
+    results = run_tickets(tickets, client_factory(), on_ticket=progress)
+    path = write_results(results)
+    summary = results["summary"]
+    out.write("\n" + format_summary(summary, summary["cost_usd"]) + "\n")
+    out.write(f"latency: {summary['latency_ms_total'] / 1000:.1f}s total\n")
+    out.write(f"Results: {path}\n")
+    return 0
+
+
+def cmd_score(args: argparse.Namespace, out: TextIO) -> int:
+    from helpdesk_agent.evals import format_summary, load_tickets, score_transcript, summarize
+
+    tickets = {t["id"]: t for t in load_tickets(args.tickets)}
+    scores = []
+    for path in sorted(args.transcripts.glob("*.json")):
+        data = json.loads(path.read_text())
+        result = score_transcript(tickets[data["ticket_id"]], data["transcript"])
+        scores.append(result)
+        mark = "pass" if result.passed else "FAIL " + ",".join(result.failed)
+        out.write(f"{path.stem:<36} {mark}\n")
+    out.write("\n" + format_summary(summarize(scores)) + "\n")
+    return 0
 
 
 def cmd_eval_retrieval(args: argparse.Namespace, out: TextIO) -> int:
@@ -175,6 +235,10 @@ def main(
         return cmd_run(args, client_factory, approver or make_tty_approver(), out)
     if args.command == "eval-retrieval":
         return cmd_eval_retrieval(args, out)
+    if args.command == "eval":
+        return cmd_eval(args, client_factory, out)
+    if args.command == "score":
+        return cmd_score(args, out)
     parser.print_help(out)
     return 0
 

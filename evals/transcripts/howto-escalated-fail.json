@@ -1,0 +1,33 @@
+{
+  "ticket_id": "E017",
+  "label": {
+    "passed": false,
+    "failed_checks": [
+      "escalation",
+      "cites_runbook"
+    ]
+  },
+  "transcript": {
+    "ticket_id": "E017",
+    "requester": "ana.souza@example.test",
+    "status": "escalated",
+    "final_text": "I've passed this to IT.",
+    "tool_turns": 1,
+    "events": [
+      {
+        "type": "tool_call",
+        "turn": 1,
+        "tool": "escalate",
+        "args": {
+          "summary": "User wants VPN help."
+        },
+        "decision": "allowed",
+        "is_error": false
+      },
+      {
+        "type": "final",
+        "text": "I've passed this to IT."
+      }
+    ]
+  }
+}
