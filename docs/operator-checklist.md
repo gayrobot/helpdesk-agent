@@ -10,8 +10,8 @@ Checked on 2026-11-13. Facts marked "verified" came from `gh api` calls and read
 
 | Actor | Can do | Never does |
 | --- | --- | --- |
-| Skylar | Everything below: Console, 1Password, GitHub settings, Cloudflare, live `op run` commands, merging PRs, typing `y` at the write gate | — |
-| Claude Code | Code, tests, docs, PRs, read-only `gh api` checks | Read `.env*`, run `op read` / `op item get` / `op inject`, run anything through `op run`, change repo settings unless Skylar asks in the session, deploy |
+| Skylar | Everything below: Console, 1Password, GitHub settings, Cloudflare, merging PRs, typing `y` at the write gate | — |
+| Claude Code | Code, tests, docs, PRs, read-only `gh api` checks, live `op run` commands (key check, `ping`, `eval`; allowed by Skylar on 2026-11-19) | Read `.env*`, run `op read` / `op item get` / `op inject`, print the key or the environment, answer a write-gate prompt, change repo settings unless Skylar asks in the session, deploy |
 | CI | Lint, format, unit tests (mocked client, `ANTHROPIC_API_KEY=""`), gitleaks | Call the real API |
 
 ## 1. When the credits land (around 2026-11-18)
@@ -23,7 +23,7 @@ None of this can start before the credits are on the account. Do it the day they
 - [ ] **Set workspace rate limits if offered.** Console UI. Lower than the org default is fine; this is a demo.
 - [ ] **Create a workspace-scoped API key.** Console UI (workspace → API keys). Name it after the project and the date, e.g. `helpdesk-agent-dev-2026-11`. The key is shown once.
 - [x] **Store the key only in 1Password.** 1Password app (not the CLI, so the value never touches shell history). Vault `nerd shit`, item `HelpDeskAgent`, field `credential`. Paste straight from the Console into 1Password. Don't paste it into a terminal, chat, file, note or Claude session.
-- [ ] **Check the reference resolves, without printing the value.** Terminal, Skylar only:
+- [x] **Check the reference resolves, without printing the value.** Terminal, Skylar or Claude Code:
 
   ```bash
   op run --env-file=.env.tpl -- sh -c 'test -n "$ANTHROPIC_API_KEY" && echo key present'
@@ -74,7 +74,7 @@ gh api -i repos/gayrobot/helpdesk-agent/vulnerability-alerts | head -1   # 204 =
 
 ## 3. Live steps (from 2026-11-18, once the key exists)
 
-**Skylar only.** These spend money and send synthetic data to the API. Claude Code and CI never run them. Run from a clean checkout of `main` after the matching phase has merged.
+**Skylar or Claude Code** (since 2026-11-19). These spend money and send synthetic data to the API. CI never runs them. Write-gate approvals stay with Skylar. Run from a clean checkout of `main` after the matching phase has merged.
 
 The subcommand names below follow `docs/plan.md`; the Phase 3 PR may change flags. Run `uv run helpdesk-agent --help` (no key needed) first and adjust.
 
