@@ -22,14 +22,14 @@ None of this can start before the credits are on the account. Do it the day they
 - [ ] **Set a spend limit on that workspace.** Console UI (workspace → Limits). Pick a monthly cap that would hurt to exceed but covers Phase 5 (50–100 tickets × a few runs, Haiku while developing). Turn on email alerts below the cap if the Console offers them.
 - [ ] **Set workspace rate limits if offered.** Console UI. Lower than the org default is fine; this is a demo.
 - [ ] **Create a workspace-scoped API key.** Console UI (workspace → API keys). Name it after the project and the date, e.g. `helpdesk-agent-dev-2026-11`. The key is shown once.
-- [ ] **Store the key only in 1Password.** 1Password app (not the CLI, so the value never touches shell history). Vault `Private`, item `Anthropic helpdesk-agent-dev`, field `credential`. Paste straight from the Console into 1Password. Don't paste it into a terminal, chat, file, note or Claude session.
-- [ ] **Check the reference resolves, without printing the value.** Terminal, Skylar or Claude Code:
+- [x] **Store the key only in 1Password.** 1Password app (not the CLI, so the value never touches shell history). Vault `nerd shit`, item `HelpDeskAgent`, field `credential`. Paste straight from the Console into 1Password. Don't paste it into a terminal, chat, file, note or Claude session.
+- [x] **Check the reference resolves, without printing the value.** Terminal, Skylar or Claude Code:
 
   ```bash
   op run --env-file=.env.tpl -- sh -c 'test -n "$ANTHROPIC_API_KEY" && echo key present'
   ```
 
-  `.env.tpl` already points at `op://Private/Anthropic helpdesk-agent-dev/credential` (verified 2026-11-13). If you rename the item, update `.env.tpl` in a PR.
+  `.env.tpl` points at `op://nerd shit/HelpDeskAgent/credential` (updated 2026-11-19 to match where the key was stored). If you rename the item, update `.env.tpl` in a PR.
 - [ ] **Set a 90-day rotation reminder.** Calendar or 1Password (item → add an expiry date, which 1Password Watchtower then flags). Date = key creation + 90 days; a key made on 2026-11-18 is due on **2027-02-16**.
 - [ ] **Confirm the local tools are installed and unlocked.** Terminal: `op --version`, `op whoami` (sign in via the 1Password app integration), `gitleaks version`, `pre-commit install` in your main checkout.
 
