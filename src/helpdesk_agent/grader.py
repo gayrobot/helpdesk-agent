@@ -4,9 +4,9 @@ The deterministic checks in ``evals.py`` decide pass/fail. They can tell that a 
 reply names the right runbook, but not whether what it says is right. This grader adds
 that, as a separate score that never changes the deterministic pass rate.
 
-- Only how-to style tickets are graded: the ticket names an expected runbook and the
-  agent answered (didn't escalate or stop early). Everything else is ``None`` and makes
-  no call.
+- Only how-to style tickets are graded, the same ones ``cites_runbook`` scores: the
+  ticket names an expected runbook and the agent finished normally (answered, or
+  escalated with a reply). Everything else is ``None`` and makes no call.
 - One tool-less call per graded ticket to ``GRADER_MODEL`` with structured output. The
   model returns three yes/no verdicts and a reason; code decides the pass.
 - The prompt lives in ``data/grader-prompt.md`` so it can be read and reviewed on its
@@ -28,6 +28,7 @@ from helpdesk_agent.retrieval import load_runbooks
 
 GRADER_MAX_TOKENS = 2_000  # thinking is on for Haiku 5.5 and counts against this
 GRADER_EFFORT = "low"
+GRADED_STATUSES = frozenset({"answered", "escalated"})  # same as evals.FINISHED
 CRITERIA = ("answers_question", "grounded", "no_contradiction")
 
 OUTPUT_FORMAT: dict[str, Any] = {
@@ -58,7 +59,7 @@ def expected_runbooks(ticket: dict[str, Any]) -> list[str]:
 
 
 def eligible(ticket: dict[str, Any], transcript: dict[str, Any]) -> bool:
-    return bool(expected_runbooks(ticket)) and transcript.get("status") == "answered"
+    return bool(expected_runbooks(ticket)) and transcript.get("status") in GRADED_STATUSES
 
 
 def runbook_text(runbook_ids: list[str]) -> str:

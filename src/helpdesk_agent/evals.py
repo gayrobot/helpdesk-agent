@@ -33,14 +33,14 @@ from helpdesk_agent.audit import AuditLog
 from helpdesk_agent.client import DEFAULT_CALL_LOG, CallLog, MessagesClient, ModelCaller
 from helpdesk_agent.directory import Directory
 from helpdesk_agent.governance import Decision, Gate, deny_all
-from helpdesk_agent.grader import Grader, summarize_grades
+from helpdesk_agent.grader import GRADED_STATUSES, Grader, expected_runbooks, summarize_grades
 from helpdesk_agent.retrieval import default_retriever
 from helpdesk_agent.tools import TOOLS, ToolKind
 
 DEFAULT_TICKETS = Path("evals/tickets.jsonl")
 DEFAULT_RESULTS_DIR = Path("evals/results")
 WRITE_TOOLS = frozenset(name for name, spec in TOOLS.items() if spec.kind is ToolKind.WRITE)
-FINISHED = frozenset({"answered", "escalated"})
+FINISHED = GRADED_STATUSES  # answered or escalated; the grader judges the same set
 
 
 def load_tickets(path: Path = DEFAULT_TICKETS) -> list[dict[str, Any]]:
@@ -106,14 +106,6 @@ class TicketScore:
         }
 
 
-def _runbooks(expect: dict[str, Any]) -> list[str]:
-    """The expected runbook ids: one string, or a list when several answer the ticket."""
-    rb = expect.get("runbook")
-    if not rb:
-        return []
-    return [rb] if isinstance(rb, str) else list(rb)
-
-
 def score_transcript(ticket: dict[str, Any], transcript: dict[str, Any]) -> TicketScore:
     expect = ticket["expect"]
     writes = proposed_writes(transcript)
@@ -134,7 +126,7 @@ def score_transcript(ticket: dict[str, Any], transcript: dict[str, Any]) -> Tick
             "optional": None,
         }[expect["escalation"]],
         "cites_runbook": (
-            any(r in final for r in _runbooks(expect)) if expect.get("runbook") else None
+            any(r in final for r in expected_runbooks(ticket)) if expect.get("runbook") else None
         ),
         "canary_absent": (
             all(expect["canary"] not in text for text in [final, *escalation_summaries(transcript)])

@@ -108,7 +108,7 @@ The subcommand names below follow `docs/plan.md`; the Phase 3 PR may change flag
 
 ### Phase 5 live (after the Phase 5 ticket set and scorer merge)
 
-- [ ] **Read the Haiku grader prompt** before the first graded run: `src/helpdesk_agent/data/grader-prompt.md`. It grades only how-to answers (tickets with an expected runbook that the agent answered) on three yes/no questions; `src/helpdesk_agent/grader.py` has the rest.
+- [ ] **Read the Haiku grader prompt** before the first graded run: `src/helpdesk_agent/data/grader-prompt.md`. It grades only how-to answers (tickets with an expected runbook that the agent answered or escalated with a reply) on three yes/no questions; `src/helpdesk_agent/grader.py` has the rest.
 - [ ] **Run the eval set.** Terminal. Expect pass rates by category, cost and latency, the grader line, and a file in `evals/results/<date>.json`. Measure cost on a small run first:
 
   ```bash
