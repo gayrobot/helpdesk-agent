@@ -12,7 +12,7 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 | 3 **live** | `ping` and the same ticket against the real API | `op run --env-file=.env.tpl -- uv run helpdesk-agent ping` replies and logs tokens and cost; the MFA ticket works for real |
 | 4 ✅ | RAG over runbooks (see below) | Retrieval eval reports recall@3 and MRR for each retriever; agent answers cite the runbook |
 | 5 ✅ | Evals: 50–100 synthetic tickets in `evals/tickets.jsonl`, auto-deny approval stub, deterministic checks first, results in `evals/results/<date>.json` (see "Adversarial evals" below). Ticket set and scorer are built key-free. | Scorer passes on hand-written transcripts in CI |
-| 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
+| 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in at `src/helpdesk_agent/data/grader-prompt.md`, run with `eval --grade`; reported separately, never changes the deterministic pass rate) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
 | 6 | Project write-up for damiano.dev: problem, architecture, governance rules, real eval numbers, cost per ticket, retrieval comparison, what fails and why | Page published |
 
 ## Governance rules (enforced in code)

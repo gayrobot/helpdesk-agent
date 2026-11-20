@@ -33,6 +33,7 @@ from helpdesk_agent.audit import AuditLog
 from helpdesk_agent.client import DEFAULT_CALL_LOG, CallLog, MessagesClient, ModelCaller
 from helpdesk_agent.directory import Directory
 from helpdesk_agent.governance import Decision, Gate, deny_all
+from helpdesk_agent.grader import Grader, summarize_grades
 from helpdesk_agent.retrieval import default_retriever
 from helpdesk_agent.tools import TOOLS, ToolKind
 
@@ -166,6 +167,15 @@ def summarize(scores: Iterable[TicketScore]) -> dict[str, Any]:
     }
 
 
+def format_grader_summary(grader: dict[str, Any]) -> str:
+    crit = ", ".join(f"{k} {v}/{grader['graded']}" for k, v in grader["by_criterion"].items())
+    return (
+        f"grader ({grader['model']}): {grader['passed']}/{grader['graded']} answers pass"
+        f" ({grader['pass_rate']:.0%}), {grader['ungraded']} ungraded; {crit};"
+        f" cost ${grader['cost_usd']:.4f}"
+    )
+
+
 def format_summary(summary: dict[str, Any], cost: float | None = None) -> str:
     lines = [f"{'category':<20} {'tickets':>7} {'passed':>7} {'rate':>6}"]
     for cat, c in summary["by_category"].items():
@@ -200,9 +210,16 @@ def run_tickets(
     call_log: CollectingCallLog | None = None,
     audit_path: Path = Path("logs/eval-audit.jsonl"),
     on_ticket: Callable[[dict[str, Any], TicketScore], None] | None = None,
+    grade: bool = False,
 ) -> dict[str, Any]:
-    """Run each ticket through the agent with auto-deny approval, then score it."""
+    """Run each ticket through the agent with auto-deny approval, then score it.
+
+    With ``grade``, how-to answers also get a Haiku quality grade (``grader.py``). The
+    grade is stored next to the deterministic score and never changes it; its cost is
+    kept apart from the agent's per-ticket cost.
+    """
     log = call_log or CollectingCallLog()
+    grader = Grader.for_client(client, log) if grade else None
     rows = []
     with tempfile.TemporaryDirectory(prefix="helpdesk-eval-") as tmp:
         for ticket in tickets:
@@ -220,15 +237,22 @@ def run_tickets(
             transcript = result.to_dict()
             ticket_score = score_transcript(ticket, transcript)
             costs = [c.get("cost_usd") for c in calls]
-            rows.append(
-                {
-                    **ticket_score.to_dict(),
-                    "transcript": transcript,
-                    "model_calls": len(calls),
-                    "cost_usd": None if None in costs else round(sum(costs), 6),
-                    "latency_ms": sum(c.get("latency_ms", 0) for c in calls),
-                }
-            )
+            row = {
+                **ticket_score.to_dict(),
+                "transcript": transcript,
+                "model_calls": len(calls),
+                "cost_usd": None if None in costs else round(sum(costs), 6),
+                "latency_ms": sum(c.get("latency_ms", 0) for c in calls),
+            }
+            if grader is not None:
+                grade_start = len(log.entries)
+                ticket_grade = grader.grade(ticket, transcript)
+                grade_costs = [c.get("cost_usd") for c in log.entries[grade_start:]]
+                row["grade"] = ticket_grade.to_dict() if ticket_grade else None
+                row["grader_cost_usd"] = (
+                    round(sum(grade_costs), 6) if grade_costs and None not in grade_costs else None
+                )
+            rows.append(row)
             if on_ticket:
                 on_ticket(ticket, ticket_score)
     summary = summarize(TicketScore(r["ticket_id"], r["category"], r["checks"]) for r in rows)
@@ -236,6 +260,8 @@ def run_tickets(
     summary["cost_usd"] = round(sum(priced), 6)
     summary["latency_ms_total"] = sum(r["latency_ms"] for r in rows)
     summary["retriever"] = default_retriever().name  # hybrid or bm25, see retrieval.py
+    if grader is not None:
+        summary["grader"] = summarize_grades(rows)
     return {"summary": summary, "tickets": rows}
 
 

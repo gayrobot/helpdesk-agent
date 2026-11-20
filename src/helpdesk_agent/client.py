@@ -149,6 +149,7 @@ class ModelCaller:
         system: str,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
+        output_format: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         params: dict[str, Any] = {
             "model": self.model,
@@ -161,8 +162,13 @@ class ModelCaller:
         }
         if tools:
             params["tools"] = tools
+        output_config: dict[str, Any] = {}
         if self.effort is not None:
-            params["output_config"] = {"effort": self.effort}
+            output_config["effort"] = self.effort
+        if output_format is not None:
+            output_config["format"] = output_format
+        if output_config:
+            params["output_config"] = output_config
         if self.fallbacks:
             params["betas"] = [FALLBACK_BETA]
             params["fallbacks"] = FALLBACKS

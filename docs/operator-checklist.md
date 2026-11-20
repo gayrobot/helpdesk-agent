@@ -108,12 +108,18 @@ The subcommand names below follow `docs/plan.md`; the Phase 3 PR may change flag
 
 ### Phase 5 live (after the Phase 5 ticket set and scorer merge)
 
-- [ ] **Read the Haiku grader prompt** checked into the repo before the first graded run.
-- [ ] **Run the eval set.** Terminal. Expect pass rates by category, cost and latency, and a file in `evals/results/<date>.json`:
+- [ ] **Read the Haiku grader prompt** before the first graded run: `src/helpdesk_agent/data/grader-prompt.md`. It grades only how-to answers (tickets with an expected runbook that the agent answered) on three yes/no questions; `src/helpdesk_agent/grader.py` has the rest.
+- [ ] **Run the eval set.** Terminal. Expect pass rates by category, cost and latency, the grader line, and a file in `evals/results/<date>.json`. Measure cost on a small run first:
 
   ```bash
-  op run --env-file=.env.tpl -- uv run helpdesk-agent eval evals/tickets.jsonl
+  op run --env-file=.env.tpl -- uv run helpdesk-agent eval --category howto --limit 3 --grade
   ```
+
+  ```bash
+  op run --env-file=.env.tpl -- uv run helpdesk-agent eval --grade
+  ```
+
+  The grade is reported next to the deterministic pass rate and never changes it; grader cost is shown on its own line, apart from the agent's cost.
 
   The approval step uses the auto-deny stub, so nothing should be written.
 - [ ] **Run it again after one system prompt change** and keep both result files; the plan's "done" needs a measurable difference.
