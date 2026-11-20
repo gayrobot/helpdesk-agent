@@ -43,3 +43,30 @@ def _tracked(name: str) -> bool:
         check=False,
     )
     return result.returncode == 0
+
+
+def _git(*args: str) -> list[str]:
+    import subprocess
+
+    result = subprocess.run(  # noqa: S603
+        ["git", *args],  # noqa: S607
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def test_no_tracked_file_matches_gitignore():
+    # Catches files that were committed before (or despite) an ignore rule,
+    # like model weights under .cache/ or logs under logs/.
+    assert _git("ls-files", "--cached", "--ignored", "--exclude-standard") == []
+
+
+def test_no_large_files_are_tracked():
+    limit = 1_000_000
+    big = [
+        p for p in _git("ls-files") if (ROOT / p).is_file() and (ROOT / p).stat().st_size > limit
+    ]
+    assert big == [], f"tracked files over {limit} bytes: {big}"

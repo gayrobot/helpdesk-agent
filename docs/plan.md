@@ -69,4 +69,4 @@ Considered and not planned, because nothing in this project gives them anything 
 
 ## Account setup (Skylar, by hand, before the live steps)
 
-Dedicated Console workspace with its own spend limit, a workspace-scoped key stored only in 1Password at `op://Private/Anthropic helpdesk-agent-dev/credential`, and a 90-day rotation reminder.
+Dedicated Console workspace with its own spend limit, a workspace-scoped key stored only in 1Password at `op://nerd shit/HelpDeskAgent/credential`, and a 90-day rotation reminder.
