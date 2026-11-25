@@ -16,7 +16,7 @@ import {
 import { parseQueries, score, scoreToDict } from "../src/retrieval-eval.ts";
 import fixtures from "./fixtures/retrieval.json" with { type: "json" };
 import { makeGate, withoutTs } from "./helpers.ts";
-import { KeywordEmbedder, QUERIES_JSONL } from "./retrieval.test.ts";
+import { KeywordEmbedder, QUERIES_JSONL } from "./shared.ts";
 
 type Ranked = [string, number][];
 const F = fixtures as unknown as {

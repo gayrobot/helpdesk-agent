@@ -222,3 +222,55 @@ export function compactStamp(d: Date, seq = 0): string {
     `${pad(d.getUTCMilliseconds(), 3)}${pad(seq % 1000, 3)}`
   );
 }
+
+/**
+ * Python `f"{x:.{digits}f}"`. JavaScript's `toFixed` rounds an exact tie up (0.25 -> "0.3");
+ * Python rounds it to even ("0.2"). Ties are found from the exact decimal expansion,
+ * which `toFixed` gives for up to 100 digits.
+ */
+export function pyFixed(x: number, digits: number): string {
+  if (!Number.isFinite(x)) return Number.isNaN(x) ? "nan" : x > 0 ? "inf" : "-inf";
+  const exact = Math.abs(x).toFixed(Math.min(100, digits + 60));
+  const cut = exact.indexOf(".") + digits + (digits > 0 ? 1 : 0);
+  const rest = exact.slice(digits > 0 ? cut : exact.indexOf(".") + 1);
+  if (/^50*$/.test(rest)) {
+    // Exact tie: keep the even neighbour.
+    const kept = digits > 0 ? exact.slice(0, cut) : exact.slice(0, exact.indexOf("."));
+    const lastDigit = Number(kept.replace(".", "").slice(-1));
+    const scale = 10 ** digits;
+    const down = Number(kept);
+    const value = lastDigit % 2 === 0 ? down : down + 1 / scale;
+    const out = value.toFixed(digits);
+    return x < 0 ? `-${out}` : out; // Python keeps the sign: f"{-0.25:.1f}" is "-0.2"
+  }
+  return x.toFixed(digits);
+}
+
+/** Python `f"{x:.0%}"`: multiply by 100 (as a float), then format with no decimals. */
+export const pyPercent0 = (x: number): string => `${pyFixed(x * 100, 0)}%`;
+
+/** Python `==` on JSON values: dicts compare without regard to key order. */
+export function pyEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((x, i) => pyEqual(x, b[i]))
+    );
+  }
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const ka = Object.keys(a);
+    const kb = Object.keys(b);
+    return (
+      ka.length === kb.length &&
+      ka.every(
+        (k) =>
+          Object.hasOwn(b, k) &&
+          pyEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+      )
+    );
+  }
+  return false;
+}
