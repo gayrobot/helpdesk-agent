@@ -64,6 +64,8 @@ export interface ToolContext {
   readonly escalations: EscalationStore;
   readonly retriever: Retriever;
   readonly clock: () => Date;
+  /** 0, 1, 2, ... per gate: keeps escalation ids unique within a millisecond. */
+  readonly nextSeq: () => number;
   readonly ticketId: string;
   readonly requester: string; // set by the harness from the ticket, never by the model
 }
@@ -260,7 +262,7 @@ async function addToGroup(ctx: ToolContext, args: Args): Promise<ToolResult> {
 
 async function escalate(ctx: ToolContext, args: Args): Promise<ToolResult> {
   const now = ctx.clock();
-  const ticket = `ESC-${compactStamp(now)}`;
+  const ticket = `ESC-${compactStamp(now, ctx.nextSeq())}`;
   await ctx.escalations.save({
     id: ticket,
     created: isoSeconds(now),

@@ -1,6 +1,6 @@
 // Twin of tests/test_tools.py. Test names match the Python ones.
 //
-// Not ported, with reason: the seven tests of `make_tty_approver` (test_tty_approver_*,
+// Not ported, with reason: the 11 cases of `make_tty_approver` (test_tty_approver_*,
 // test_prompt_*). The TypeScript agent has no terminal prompt: approval comes from the
 // web page (slice 6, whose tests will cover the same rules: exact approval only, every
 // field passed through display(), the requester/target mismatch flag) and evals use
@@ -73,3 +73,15 @@ test("ts_prototype_names_are_not_tools", () => {
     assert.equal(TOOLS.get(name), undefined);
   }
 });
+
+// The rules the terminal-prompt tests enforced, kept as placeholders so the web approver
+// (slice 6) can't ship without them. Each names the Python test it replaces.
+for (const [python, rule] of [
+  ["test_tty_approver_needs_exact_y", "only an explicit Approve on that proposal approves"],
+  ["test_tty_approver_denies_without_a_terminal", "no interactive operator means deny"],
+  ["test_prompt_shows_requester_next_to_target", "the page shows requester next to target"],
+  ["test_prompt_flags_requester_target_mismatch", "the page flags requester != target"],
+  ["test_prompt_strips_escapes_from_every_field", "every shown field goes through display()"],
+] as const) {
+  test.todo(`${python}: ${rule} (web approver, slice 6)`);
+}

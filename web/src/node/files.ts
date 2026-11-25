@@ -48,6 +48,9 @@ export class FileEscalations implements EscalationStore {
 
   async save(record: EscalationRecord): Promise<void> {
     await mkdir(this.dir, { recursive: true });
-    await writeFile(join(this.dir, `${record.id}.json`), `${JSON.stringify(record, null, 2)}\n`);
+    // "wx": never overwrite an existing escalation; fail instead.
+    await writeFile(join(this.dir, `${record.id}.json`), `${JSON.stringify(record, null, 2)}\n`, {
+      flag: "wx",
+    });
   }
 }

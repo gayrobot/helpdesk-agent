@@ -24,6 +24,7 @@ the Python code.
 from __future__ import annotations
 
 import json
+import os
 import random
 import sys
 import tempfile
@@ -92,6 +93,7 @@ def unicode_tables() -> dict[str, Any]:
         "casefold": casefold,
         "format": _ranges(lambda ch: unicodedata.category(ch) == "Cf"),
         "other": _ranges(lambda ch: unicodedata.category(ch)[0] == "C"),
+        "unassigned": _ranges(lambda ch: unicodedata.category(ch) == "Cn"),
         "whitespace": _ranges(str.isspace),
         "printable": _ranges(str.isprintable),
         "letters": _labelled_letter_ranges(),
@@ -141,6 +143,8 @@ STRING_SAMPLES = [
     "日本admins",
     "한국어",
     "עברית",
+    "\U0001ccd6DMINS",  # outlined Latin A: Unicode 16, unassigned in Python 3.12
+    "vpn-\U0001ccf4sers",
     "adminś",
     "",
     "   ",
@@ -323,6 +327,17 @@ def _gate_cases() -> list[dict[str, Any]]:
     case("escalate", [step("escalate", {"summary": "Requester asked for admins; refused."})])
     case("escalate long", [step("escalate", {"summary": "x" * 1500})])
     case("escalate too long", [step("escalate", {"summary": "x" * 2001})])
+    case("escalate 400 emoji", [step("escalate", {"summary": "\U0001f600" * 400})])
+    case(
+        "group with a post-15.0 letter",
+        [step("add_to_group", {"email": JAMIE, "group": "\U0001ccd6DMINS"})],
+        approver="approve",
+    )
+    for user in json.loads(
+        (ROOT / "src" / "helpdesk_agent" / "data" / "directory.json").read_text()
+    )["users"]:
+        case(f"read {user['email']}", [step("lookup_user", {"email": user["email"]})])
+        case(f"devices {user['email']}", [step("list_devices", {"email": user["email"]})])
     case("escalate unicode", [step("escalate", {"summary": 'Café — 日本 \U0001f600 "q" \\ \n'})])
     case("search too long", [step("search_runbooks", {"query": "q" * 301})])
     case(
@@ -396,7 +411,9 @@ class _MemoryAudit(AuditLog):
 
     def record(self, event: str, **fields: Any) -> None:
         # Same shape as AuditLog.record, minus the timestamp (it isn't fixed).
-        tmp = Path(tempfile.mkstemp(suffix=".jsonl")[1])
+        fd, name = tempfile.mkstemp(suffix=".jsonl")
+        os.close(fd)
+        tmp = Path(name)
         try:
             AuditLog(tmp).record(event, **fields)
             entry = json.loads(tmp.read_text())

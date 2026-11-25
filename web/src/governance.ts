@@ -184,6 +184,10 @@ export class Gate {
       escalations: options.escalations,
       retriever: options.retriever,
       clock: options.clock ?? (() => new Date()),
+      nextSeq: (() => {
+        let seq = 0;
+        return () => seq++;
+      })(),
       ticketId: options.ticketId,
       requester,
     };

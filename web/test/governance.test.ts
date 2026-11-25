@@ -561,3 +561,21 @@ test("ts_audit_sink_failure_on_a_read_propagates", async () => {
   });
   await assert.rejects(gate.execute("lookup_user", { email: JAMIE }), /audit down/);
 });
+
+test("ts_escalation_ids_are_unique_within_a_millisecond", async () => {
+  // JavaScript clocks stop at milliseconds; a per-gate counter fills the last 3 digits.
+  const { gate, escalations } = makeGate();
+  const ids = [];
+  for (const summary of ["one", "two", "three"]) {
+    ids.push(JSON.parse((await gate.execute("escalate", { summary })).content).ticket);
+  }
+  assert.deepEqual(ids, [
+    "ESC-20261125-160143091000",
+    "ESC-20261125-160143091001",
+    "ESC-20261125-160143091002",
+  ]);
+  assert.deepEqual(
+    escalations.saved.map((r) => r.id),
+    ids,
+  );
+});

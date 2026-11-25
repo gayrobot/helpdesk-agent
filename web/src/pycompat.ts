@@ -17,6 +17,7 @@ interface Tables {
   casefold: Record<string, string>;
   format: Range[];
   other: Range[];
+  unassigned: Range[];
   whitespace: Range[];
   printable: Range[];
   letters: [number, number, string][];
@@ -45,6 +46,29 @@ const cpOf = (ch: string): number => ch.codePointAt(0) ?? 0;
 export const isFormat = (ch: string): boolean => findRange(T.format, cpOf(ch)) !== null;
 /** Python `unicodedata.category(ch)[0] == "C"`. */
 export const isOther = (ch: string): boolean => findRange(T.other, cpOf(ch)) !== null;
+/** Python `unicodedata.category(ch) == "Cn"`: a code point Python 3.12 doesn't know. */
+export const isUnassigned = (ch: string): boolean => findRange(T.unassigned, cpOf(ch)) !== null;
+
+/**
+ * Python 3.12's `unicodedata.normalize("NFKC", text)`. JavaScript's NFKC follows a newer
+ * Unicode, so it also folds characters Python doesn't know (e.g. U+1CCD6, an outlined
+ * "A", becomes "A"). Python leaves those alone, so runs of them are kept as they are and
+ * only the rest is normalized.
+ */
+export function pyNfkc(text: string): string {
+  let out = "";
+  let known = "";
+  for (const ch of text) {
+    if (isUnassigned(ch)) {
+      out += known.normalize("NFKC") + ch;
+      known = "";
+    } else {
+      known += ch;
+    }
+  }
+  return out + known.normalize("NFKC");
+}
+
 /** Python `ch.isspace()`. */
 export const isSpace = (ch: string): boolean => findRange(T.whitespace, cpOf(ch)) !== null;
 /** Python `ch.isprintable()`. */
@@ -186,11 +210,15 @@ export function isoDate(d: Date): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
-/** Python `f"{now:%Y%m%d-%H%M%S%f}"` (microseconds; JavaScript dates have milliseconds). */
-export function compactStamp(d: Date): string {
+/**
+ * Python `f"{now:%Y%m%d-%H%M%S%f}"`. JavaScript dates stop at milliseconds, so the last
+ * three of the six fraction digits hold `seq` (0-999) instead of microseconds. The
+ * caller passes a counter, so two ids made in the same millisecond still differ.
+ */
+export function compactStamp(d: Date, seq = 0): string {
   return (
     `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-` +
     `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}` +
-    `${pad(d.getUTCMilliseconds(), 3)}000`
+    `${pad(d.getUTCMilliseconds(), 3)}${pad(seq % 1000, 3)}`
   );
 }

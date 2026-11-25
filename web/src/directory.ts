@@ -6,7 +6,7 @@
  * fresh copy, as in Python.
  */
 import { loadDirectoryData, type RawDirectory, type RawGroup, type RawUser } from "./data.ts";
-import { casefold, isFormat, letterLabel, pySplit } from "./pycompat.ts";
+import { casefold, isFormat, letterLabel, pyNfkc, pySplit } from "./pycompat.ts";
 
 export const PRIVILEGED_NAME_MARKERS = [
   "admin",
@@ -23,7 +23,7 @@ export const PRIVILEGED_NAME_MARKERS = [
  * look-alike or padded name resolves to the real record or to nothing.
  */
 export function normalize(value: string): string {
-  let text = value.normalize("NFKC");
+  let text = pyNfkc(value);
   text = [...text].filter((ch) => !isFormat(ch)).join("");
   return casefold(pySplit(text).join(" "));
 }
@@ -35,7 +35,7 @@ export function normalize(value: string): string {
  */
 export function letterScripts(value: string): Set<string> {
   const scripts = new Set<string>();
-  for (const ch of value.normalize("NFKC")) {
+  for (const ch of pyNfkc(value)) {
     const label = letterLabel(ch);
     if (label !== null) scripts.add(label);
   }
