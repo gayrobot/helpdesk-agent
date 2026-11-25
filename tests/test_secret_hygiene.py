@@ -25,12 +25,24 @@ def test_env_template_holds_only_1password_references():
 
 def test_gitignore_blocks_env_files_and_logs():
     ignored = (ROOT / ".gitignore").read_text().splitlines()
-    for pattern in (".env", ".env.*", "!.env.tpl", "logs/", "*.jsonl"):
+    for pattern in (".env", ".env.*", "!.env.tpl", ".dev.vars", ".dev.vars*", "logs/", "*.jsonl"):
         assert pattern in ignored, f"{pattern!r} missing from .gitignore"
 
 
 def test_no_real_env_file_is_tracked():
     assert not _tracked(".env")
+
+
+def test_no_wrangler_secrets_file_is_tracked():
+    assert _git("ls-files", "*.dev.vars*") == []
+
+
+def test_claude_code_is_denied_reading_secret_files():
+    import json
+
+    deny = json.loads((ROOT / ".claude" / "settings.json").read_text())["permissions"]["deny"]
+    for rule in ("Read(./.env)", "Read(**/.dev.vars)", "Read(**/.dev.vars*)", "Bash(op read:*)"):
+        assert rule in deny, f"{rule} missing from .claude/settings.json deny list"
 
 
 def _tracked(name: str) -> bool:

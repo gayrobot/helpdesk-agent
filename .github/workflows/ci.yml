@@ -37,6 +37,21 @@ jobs:
           # Belt and braces: make sure nothing can reach the real API from CI.
           ANTHROPIC_API_KEY: ""
 
+      # Phase 7: the TypeScript rewrite in web/. Same job, so it is covered by the
+      # required "lint + test" check. npm ci installs exactly the lockfile, with no
+      # install scripts (web/.npmrc).
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install web/ (locked)
+        working-directory: web
+        run: npm ci
+      - name: web/ lint, type check, unit tests
+        working-directory: web
+        run: npm run check
+        env:
+          ANTHROPIC_API_KEY: ""
+
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
