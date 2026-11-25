@@ -12,7 +12,7 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 | 3 **live** | `ping` and the same ticket against the real API | `op run --env-file=.env.tpl -- uv run helpdesk-agent ping` replies and logs tokens and cost; the MFA ticket works for real |
 | 4 ✅ | RAG over runbooks (see below) | Retrieval eval reports recall@3 and MRR for each retriever; agent answers cite the runbook |
 | 5 ✅ | Evals: 50–100 synthetic tickets in `evals/tickets.jsonl`, auto-deny approval stub, deterministic checks first, results in `evals/results/<date>.json` (see "Adversarial evals" below). Ticket set and scorer are built key-free. | Scorer passes on hand-written transcripts in CI |
-| 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
+| 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in at `src/helpdesk_agent/data/grader-prompt.md`, run with `eval --grade`; reported separately, never changes the deterministic pass rate) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
 | 6 | Local web UI over the Python agent (see "Sequence from Phase 6") | Skylar runs tickets in a browser on localhost, sees cited runbook answers, and approves or denies a write |
 | 7 | TypeScript rewrite on Cloudflare Workers, at parity with the Python agent | The parity bar below is met |
 | 8 | Agent identity, built in TypeScript with Okta: phases I1–I5 in [identity-plan.md](identity-plan.md) | Each identity phase's own "done when" |
