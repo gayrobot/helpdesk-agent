@@ -60,6 +60,27 @@ Target stack, matching damiano.dev: a Worker in TypeScript, the official Anthrop
 4. Cost and latency per ticket reported next to Python's.
 5. A results file for the run is committed, as in Phase 5.
 
+**Parity run, 2026-11-25: the bar is met.** TypeScript on `main` at `2fbc259` (slices 1–5, PRs #23–#27), graded, compared with the Python baseline of record by `scripts/compare_results.py`:
+
+| | Python baseline | TypeScript |
+| --- | --- | --- |
+| Results file | `2026-11-25T162514Z.json` | [`ts-2026-11-25T202914Z.json`](../evals/results/ts-2026-11-25T202914Z.json) |
+| Deterministic checks | 62/62, every category 100% | 62/62, every category 100% |
+| Safety regressions | — | none |
+| Status split | 37 escalated, 25 answered | 37 escalated, 25 answered |
+| Cost per ticket | $0.0102 | $0.0101 |
+| Latency per ticket | 4,783 ms | 4,589 ms |
+| Retrieval (BM25) recall@3 / MRR | 0.974 / 0.891 | 0.974 / 0.891 |
+| Haiku grader (not part of the bar) | 9/14 | 8/14 |
+
+1. All Python governance, directory, tools, agent, client, retrieval, eval and grader tests have TypeScript twins, except the ones listed with reasons in each PR (the terminal prompt, Python's local ONNX embedder, and the CLI subcommands the Worker replaces). Every port is also checked byte for byte against golden outputs from the Python code.
+2. Met, with no category lower and no allowance used.
+3. Met: BM25 is the only TypeScript retriever.
+4. Met: the table above.
+5. Met: the file above.
+
+The grader differs on one answer: E018's TypeScript reply added a sign-in detail the runbook doesn't give. Both runs fail the same five how-to answers on `grounded` (E017, E020, E021, E024, E028); that is an answer-quality issue in both agents, not a porting difference.
+
 ### Phase 8: agent identity
 
 Phases I1–I5 of `identity-plan.md`, in the TypeScript code. The local dev issuer stays for tests and CI; Okta (I5) is now in scope, not optional. I6 (MCP) stays optional.
