@@ -2,17 +2,13 @@
 import { MemoryAudit } from "../src/audit.ts";
 import { Directory } from "../src/directory.ts";
 import { type Approver, denyAll, Gate, type Proposal } from "../src/governance.ts";
-import type { EscalationRecord, EscalationStore, Retriever, RunbookHit } from "../src/tools.ts";
+import { MemoryEscalations } from "../src/memory.ts";
+import type { Retriever, RunbookHit } from "../src/tools.ts";
+
+export { MemoryEscalations };
 
 export const JAMIE = "jamie@example.test";
 export const FIXED_NOW = new Date("2026-11-25T16:01:43.091Z");
-
-export class MemoryEscalations implements EscalationStore {
-  readonly saved: EscalationRecord[] = [];
-  async save(record: EscalationRecord): Promise<void> {
-    this.saved.push(record);
-  }
-}
 
 /** Stand-in until BM25 is ported (slice 4). */
 export class StubRetriever implements Retriever {

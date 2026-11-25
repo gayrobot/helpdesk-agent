@@ -44,6 +44,17 @@ UNICODE_PATH = ROOT / "web" / "src" / "generated" / "unicode-py312.json"
 FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "governance.json"
 AGENT_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "agent.json"
 RETRIEVAL_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "retrieval.json"
+EVALS_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "evals.json"
+
+# The committed Python eval runs used as real model traffic for the fixtures. Named, not
+# globbed: new results files (including TypeScript runs, ts-*.json) must not change them.
+PY_RESULT_FILES = (
+    "2026-11-19T222643Z.json",
+    "2026-11-19T234626Z.json",
+    "2026-11-20T000635Z.json",
+    "2026-11-20T045534Z.json",
+    "2026-11-25T153205Z.json",
+)
 
 # The TypeScript port compares against BM25, the retriever the Python baseline runs used.
 os.environ["HELPDESK_RETRIEVER"] = "bm25"
@@ -885,7 +896,7 @@ MARKDOWN_CASES = [
 def _search_queries() -> list[str]:
     """Every query the live Python agent sent to search_runbooks in the committed runs."""
     seen: dict[str, None] = {}
-    for path in sorted((ROOT / "evals" / "results").glob("*.json")):
+    for path in (ROOT / "evals" / "results" / name for name in PY_RESULT_FILES):
         data = json.loads(path.read_text())
         for ticket in data.get("tickets", []):
             for event in ticket.get("transcript", {}).get("events", []):
@@ -979,6 +990,226 @@ def retrieval_fixtures() -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------- evals and grader (slice 5)
+
+
+def _real_transcripts() -> list[dict[str, Any]]:
+    """Every transcript in the committed result files, plus the hand-labelled ones."""
+    out = []
+    for path in (ROOT / "evals" / "results" / name for name in PY_RESULT_FILES):
+        for row in json.loads(path.read_text())["tickets"]:
+            out.append(
+                {
+                    "source": path.name,
+                    "ticket_id": row["ticket_id"],
+                    "transcript": row["transcript"],
+                }
+            )
+    for path in sorted((ROOT / "evals" / "transcripts").glob("*.json")):
+        data = json.loads(path.read_text())
+        out.append(
+            {"source": path.name, "ticket_id": data["ticket_id"], "transcript": data["transcript"]}
+        )
+    return out
+
+
+RUNNER_SCRIPTS = {
+    "E001": [  # MFA reset: auto-denied, answered
+        {"content": [("tool_use", "reset_mfa", {"email": JAMIE}, "t1")], "stop": "tool_use"},
+        {"content": [("text", "It wasn't approved; IT will follow up.")], "stop": "end_turn"},
+    ],
+    "E017": [  # how-to: search, cite
+        {
+            "content": [("tool_use", "search_runbooks", {"query": "set up VPN"}, "t1")],
+            "stop": "tool_use",
+        },
+        {"content": [("text", "Install Larkspur Connect. Source: vpn-setup")], "stop": "end_turn"},
+    ],
+    "E018": [  # how-to: refusal, so not graded
+        {"content": [], "stop": "refusal"},
+    ],
+}
+
+
+def _grader_turn(body: str, stop: str = "end_turn") -> dict[str, Any]:
+    from helpdesk_agent.client import GRADER_MODEL
+
+    return {
+        "content": [("thinking",), ("text", body)],
+        "stop": stop,
+        "model": GRADER_MODEL,
+        "usage": {"input_tokens": 2000, "output_tokens": 80},
+    }
+
+
+def evals_fixtures() -> dict[str, Any]:
+    from fakes import FakeClient
+
+    from helpdesk_agent.evals import (
+        CollectingCallLog,
+        format_grader_summary,
+        format_summary,
+        load_tickets,
+        run_tickets,
+        score_transcript,
+        summarize,
+    )
+    from helpdesk_agent.grader import (
+        CRITERIA,
+        OUTPUT_FORMAT,
+        build_user_message,
+        eligible,
+        load_prompt,
+        parse_grade,
+    )
+
+    tickets = load_tickets(ROOT / "evals" / "tickets.jsonl")
+    by_id = {t["id"]: t for t in tickets}
+    real = _real_transcripts()
+    scored = []
+    for item in real:
+        result = score_transcript(by_id[item["ticket_id"]], item["transcript"])
+        scored.append({**item, "score": result.to_dict(), "failed": result.failed})
+    scores_by_source: dict[str, list[Any]] = {}
+    for item in real:
+        result = score_transcript(by_id[item["ticket_id"]], item["transcript"])
+        scores_by_source.setdefault(item["source"], []).append(result)
+    summaries = {}
+    for source, items in scores_by_source.items():
+        summary = summarize(items)
+        summaries[source] = {
+            "summary": summary,
+            "table": format_summary(summary),
+            "table_with_cost": format_summary(summary, 0.633712),
+        }
+
+    verdict_ok = json.dumps({**dict.fromkeys(CRITERIA, True), "reason": "Matches the runbook."})
+    parse_cases = [
+        verdict_ok,
+        json.dumps(
+            {**dict.fromkeys(CRITERIA, True), "grounded": False, "reason": "Invents a port."}
+        ),
+        "not json",
+        "[]",
+        json.dumps({"answers_question": True, "reason": ""}),
+        json.dumps({**dict.fromkeys(CRITERIA, True), "grounded": "yes", "reason": "x"}),
+        json.dumps({**dict.fromkeys(CRITERIA, True), "reason": "x", "extra": True}),
+        json.dumps({**dict.fromkeys(CRITERIA, True), "reason": 5}),
+        json.dumps({**dict.fromkeys(CRITERIA, 1), "reason": "ints are not bools"}),
+        '  {"answers_question": true, "grounded": true, "no_contradiction": true, "reason": "ws"} ',
+        '{"answers_question": true, "answers_question": false, '
+        '"grounded": true, "no_contradiction": true, "reason": "dup"}',
+        "",
+    ]
+    statuses = ["answered", "escalated", "turn_limit", "refused", "incomplete", "api_error"]
+
+    # The runner with a scripted model, graded and not.
+    runs = {}
+    for grade in (False, True):
+        script_items = []
+        for tid in RUNNER_SCRIPTS:
+            script_items += _script_items({"turns": RUNNER_SCRIPTS[tid]})
+            if grade and tid == "E017":
+                script_items += _script_items(
+                    {
+                        "turns": [
+                            _grader_turn(
+                                json.dumps(
+                                    {
+                                        **dict.fromkeys(CRITERIA, True),
+                                        "grounded": False,
+                                        "reason": "Adds a step.",
+                                    }
+                                )
+                            )
+                        ]
+                    }
+                )
+        with tempfile.TemporaryDirectory() as tmp:
+            log = CollectingCallLog(Path(tmp) / "calls.jsonl")
+            results = run_tickets(
+                [by_id[t] for t in RUNNER_SCRIPTS],
+                FakeClient(script_items),
+                call_log=log,
+                audit_path=Path(tmp) / "audit.jsonl",
+                grade=grade,
+            )
+        for row in results["tickets"]:
+            row.pop("latency_ms")
+        results["summary"].pop("latency_ms_total")
+        if grade:
+            results["summary"]["grader_table"] = format_grader_summary(results["summary"]["grader"])
+        runs["graded" if grade else "plain"] = results
+
+    format_values = [
+        0,
+        0.005,
+        0.125,
+        0.25,
+        0.35,
+        0.5,
+        0.625,
+        0.6429,
+        0.875,
+        0.9286,
+        0.9737,
+        1,
+        1.5,
+        2.5,
+        0.03125,
+        0.633712,
+        0.0035,
+        309.45,
+        296.5,
+        0.25e-4,
+        12.345,
+        -0.25,
+        1.005,
+        0.6666666,
+    ]
+    formats = [
+        {"value": v, "percent0": f"{v:.0%}", "fixed1": f"{v:.1f}", "fixed4": f"{v:.4f}"}
+        for v in format_values
+    ]
+    return {
+        "formats": formats,
+        "scores": scored,
+        "summaries": summaries,
+        "grader": {
+            "prompt": load_prompt(),
+            "output_format": OUTPUT_FORMAT,
+            "user_messages": [
+                {
+                    "ticket_id": t["id"],
+                    "reply": "Do the thing.",
+                    "message": build_user_message(t, "Do the thing."),
+                }
+                for t in tickets
+                if t["expect"].get("runbook")
+            ],
+            "eligible": [
+                {"ticket_id": t["id"], "status": st, "eligible": eligible(t, {"status": st})}
+                for t in tickets
+                for st in statuses
+            ],
+            "parse": [{"text": c, "grade": parse_grade(c).to_dict()} for c in parse_cases],
+            "summary_table": format_grader_summary(
+                {
+                    "model": "claude-haiku-5-5",
+                    "eligible": 14,
+                    "graded": 14,
+                    "ungraded": 0,
+                    "passed": 9,
+                    "pass_rate": 0.6429,
+                    "by_criterion": {"answers_question": 13, "grounded": 9, "no_contradiction": 14},
+                    "cost_usd": 0.003464,
+                }
+            ),
+        },
+        "runner": {"scripts": RUNNER_SCRIPTS, "runs": runs},
+    }
+
+
 def render() -> dict[Path, str]:
     original = tools_module.datetime
     tools_module.datetime = _FixedDatetime
@@ -990,6 +1221,7 @@ def render() -> dict[Path, str]:
         AGENT_FIXTURES_PATH: json.dumps(agent, ensure_ascii=True, indent=1) + "\n",
         RETRIEVAL_FIXTURES_PATH: json.dumps(retrieval_fixtures(), ensure_ascii=True, indent=1)
         + "\n",
+        EVALS_FIXTURES_PATH: json.dumps(evals_fixtures(), ensure_ascii=True, indent=1) + "\n",
         UNICODE_PATH: json.dumps(unicode_tables(), ensure_ascii=True, separators=(",", ":")) + "\n",
         FIXTURES_PATH: json.dumps(governance_fixtures(), ensure_ascii=True, indent=1) + "\n",
     }

@@ -6,7 +6,6 @@
 // model locally and can't run in a Worker, so the TypeScript agent uses BM25, as the
 // Python baseline runs did. Any embedding model added later gets its own pinning tests.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { loadRunbooks } from "../src/node/runbooks.ts";
@@ -14,7 +13,6 @@ import {
   BM25Retriever,
   type Chunk,
   chunkMarkdown,
-  type Embedder,
   EmbeddingRetriever,
   HybridRetriever,
   RankingRetriever,
@@ -23,31 +21,7 @@ import {
 } from "../src/retrieval.ts";
 import { parseQueries, score } from "../src/retrieval-eval.ts";
 import { JAMIE, makeGate } from "./helpers.ts";
-
-export const QUERIES_JSONL = readFileSync(
-  new URL("../../evals/retrieval.jsonl", import.meta.url),
-  "utf8",
-);
-
-/** Deterministic stand-in for a real embedding model: bag of words over a vocab. */
-export class KeywordEmbedder implements Embedder {
-  static readonly VOCAB = [
-    "vpn",
-    "mfa",
-    "okta",
-    "password",
-    "mac",
-    "laptop",
-    "wifi",
-    "phishing",
-    "group",
-  ];
-  embed(texts: readonly string[]): number[][] {
-    return texts.map((t) =>
-      KeywordEmbedder.VOCAB.map((w) => (t.toLowerCase().includes(w) ? 1.0 : 0.0)),
-    );
-  }
-}
+import { KeywordEmbedder, QUERIES_JSONL } from "./shared.ts";
 
 const chunks = loadRunbooks();
 
