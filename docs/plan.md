@@ -13,7 +13,64 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 | 4 ✅ | RAG over runbooks (see below) | Retrieval eval reports recall@3 and MRR for each retriever; agent answers cite the runbook |
 | 5 ✅ | Evals: 50–100 synthetic tickets in `evals/tickets.jsonl`, auto-deny approval stub, deterministic checks first, results in `evals/results/<date>.json` (see "Adversarial evals" below). Ticket set and scorer are built key-free. | Scorer passes on hand-written transcripts in CI |
 | 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in at `src/helpdesk_agent/data/grader-prompt.md`, run with `eval --grade`; reported separately, never changes the deterministic pass rate) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
-| 6 | Project write-up for damiano.dev: problem, architecture, governance rules, real eval numbers, cost per ticket, retrieval comparison, what fails and why | Page published |
+| 6 | Local web UI over the Python agent (see "Sequence from Phase 6") | Skylar runs tickets in a browser on localhost, sees cited runbook answers, and approves or denies a write |
+| 7 | TypeScript rewrite on Cloudflare Workers, at parity with the Python agent | The parity bar below is met |
+| 8 | Agent identity, built in TypeScript with Okta: phases I1–I5 in [identity-plan.md](identity-plan.md) | Each identity phase's own "done when" |
+| 9 | Public site: anonymous limited chat, persona sign-in, per-user agent permissions | Checks below pass on a preview deploy |
+| 10 | Deploy to `helpdesk-agent.damiano.dev` and publish the write-up | Live site; write-up published with real numbers; damiano.dev project entry merged |
+
+## Sequence from Phase 6 (decided 2026-11-24)
+
+The project is now a web app, not only a CLI. Order: see it work locally, rewrite it web-native, add identity, build the public site, deploy. The old Phase 6 (a static write-up page) moves to Phase 10. Agent identity is specified in [identity-plan.md](identity-plan.md), whose phases are numbered I1–I6.
+
+**Before Phase 7 (Skylar):** create the Okta Integrator Free Plan org. See `docs/operator-checklist.md`. Nothing uses it until Phase 8 (I5), and it holds synthetic users only.
+
+### Phase 6: local web UI
+
+Purpose: let Skylar see the existing agent work. It is a viewer over the Python code, not the product, and it is retired when Phase 7 reaches parity.
+
+- A small web server in this repo serving one chat page. Prefer the standard library (`http.server`) so no dependency is added; if a framework is needed, it gets a dependency review first.
+- Binds to `127.0.0.1` only. Never `0.0.0.0`, never exposed or tunnelled.
+- Started through `op run --env-file=.env.tpl -- ...` like every live command. The key never reaches the browser.
+- The page has a "requester" picker (synthetic users from `directory.json`), a ticket box, the agent's reply with its `Source:` line, and a panel listing each tool call and its policy decision.
+- Write proposals show the same fields as the terminal prompt (tool, exact arguments, effect, requester, target, the mismatch flag) with Approve and Deny buttons. Approve runs only from a fresh click by Skylar on that proposal; one proposal per click, no "approve all". Claude Code never clicks Approve.
+- Every governance rule still runs in `Gate`; the UI only replaces how `y` is typed. Audit and call logs are written as they are today.
+- Also before Phase 7: one full 62-ticket run on current `main`. It becomes the parity baseline.
+
+### Phase 7: TypeScript rewrite on Cloudflare Workers
+
+Target stack, matching damiano.dev: a Worker in TypeScript, the official Anthropic TypeScript SDK, static assets for the UI, one Durable Object per session holding that visitor's copy of the fake directory and its audit trail, `wrangler`, deploys from GitHub Actions only.
+
+- **Where:** `web/` in this repo, next to the Python code, the ticket set and the results. The Python package stays as the reference implementation until parity, then is frozen (not deleted; Skylar decides later). Both test suites run in CI until then.
+- **What is ported, one to one:** the directory and its normalization, the tool registry, `validate_args`, every policy check, the write gate (approval comes from the UI, auto-deny in evals), the agent loop with its 8-turn limit and harness escalation, the system prompt, call logging (model, request ID, tokens, cost, latency, stop reason), the audit log, and the eval runner and scorer reading the same `evals/tickets.jsonl` and `evals/retrieval.jsonl`.
+- **Tests are ported, not rewritten from memory.** Each Python governance test gets a TypeScript twin with the same cases, including every bypass attempt. A test may only be dropped with a written reason in the PR.
+- **Retrieval:** BM25 ported first. Local fastembed doesn't run in a Worker, so any embedding retriever is new and must be measured on `evals/retrieval.jsonl` like the others; keep it only if it beats TypeScript BM25.
+- **Secrets:** the deployed key is a Worker secret from a separate Console workspace with its own spend limit. Locally, the key reaches `wrangler dev` or the eval runner only through `op run`. Never write it to `.dev.vars` or any other file; add `.dev.vars*` to `.gitignore` and to the deny list in `.claude/settings.json`. If a tool can't take the key without a file, stop and ask Skylar.
+- **Dependencies:** same rules as Python: exact pins, a committed lockfile, a 7-day release cooldown enforced by the package manager or a CI check, and a short review per package. Prefer platform APIs (Web Crypto, fetch) over packages. Actions stay pinned by SHA.
+- **CI stays key-free:** unit tests with a mocked model client, lint, type check, gitleaks. Live evals run locally through `op run`.
+
+**Parity bar, done when all hold:**
+1. Every ported governance test passes, with the same cases as Python.
+2. A full 62-ticket TypeScript run, compared with the Phase 6 Python baseline: no category scores lower, and the hard safety checks (no forbidden write proposed, no canary leaked, no write outside `allowed_writes`) pass on every ticket the Python agent passed them on.
+3. Retrieval recall@3 and MRR reported for every TypeScript retriever.
+4. Cost and latency per ticket reported next to Python's.
+5. A results file for the run is committed, as in Phase 5.
+
+### Phase 8: agent identity
+
+Phases I1–I5 of `identity-plan.md`, in the TypeScript code. The local dev issuer stays for tests and CI; Okta (I5) is now in scope, not optional. I6 (MCP) stays optional.
+
+### Phase 9: public site
+
+- **Anonymous:** a page saying what the project is, plus limited chat: runbook questions only (`search_runbooks` and the reply, no directory reads, no writes), a cheap model, Turnstile, rate limits per IP and per day.
+- **Signed in (Okta):** demo personas, e.g. an engineer, a manager and an IT approver. The agent acts for the signed-in persona with that persona's permissions only, as I1–I4 define. Writes change only that session's Durable Object.
+- **Who may sign in** (decide here): personas open to any visitor, or only Skylar and invited reviewers behind Cloudflare Access.
+- No visitor text in logs beyond what is needed to debug, and a banner that the company is fictional and real details must not be entered.
+- The model never sees a token, an approval receipt, a session cookie or the key.
+
+### Phase 10: deploy and write-up
+
+Only after Phase 9 passes on a preview. Same harness as damiano.dev: production deploys from `main` through Actions only, PR previews, a scoped Cloudflare token stored in a GitHub environment, the custom domain `helpdesk-agent.damiano.dev`. Then the write-up (problem, architecture, governance, real eval numbers including the Python-to-TypeScript comparison, cost per ticket, retrieval comparison, what fails and why) and the damiano.dev project entry. Claude Code builds and opens PRs; Skylar creates tokens, deploys the first time if needed, and merges.
 
 ## Governance rules (enforced in code)
 
@@ -60,7 +117,7 @@ Optional later: Voyage AI embeddings (hosted, a second 1Password-stored key) as 
 
 ## Out of scope
 
-Considered and not planned, because nothing in this project gives them anything to act on: multi-tenant identity binding, JWT/OIDC, per-request scoped service tokens (RFC 8693), Cedar policy files, outbound DLP scanning, and signature-based "injection scanners" (easy to bypass and they give false confidence).
+Considered and not planned, because nothing in this project gives them anything to act on (JWT/OIDC and scoped tokens are brought into scope by identity phase I1): multi-tenant identity binding, JWT/OIDC, per-request scoped service tokens (RFC 8693), Cedar policy files, outbound DLP scanning, and signature-based "injection scanners" (easy to bypass and they give false confidence).
 
 ## Models
 
