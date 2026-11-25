@@ -2,6 +2,7 @@
 
     helpdesk-agent ping [--dry-run]
     helpdesk-agent run --requester EMAIL (--ticket TEXT | --ticket-file PATH) [--dry-run]
+    helpdesk-agent serve [--port 8765]
 
 Live calls need ``ANTHROPIC_API_KEY``, which only ``op run --env-file=.env.tpl`` provides.
 ``--dry-run`` prints what would be sent and never builds a client, so it needs no key.
@@ -73,6 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also grade how-to answers with Haiku (data/grader-prompt.md).",
     )
+
+    serve = sub.add_parser(
+        "serve", help="Local web page on 127.0.0.1 for running tickets (live, needs key)."
+    )
+    serve.add_argument("--port", type=int, default=8765, help="Port on 127.0.0.1.")
 
     score = sub.add_parser("score", help="Score hand-written transcripts (no key).")
     score.add_argument("transcripts", type=Path, nargs="?", default=Path("evals/transcripts"))
@@ -259,6 +265,10 @@ def main(
         return cmd_eval(args, client_factory, out)
     if args.command == "score":
         return cmd_score(args, out)
+    if args.command == "serve":
+        from helpdesk_agent.webui import serve
+
+        return serve(client_factory(), port=args.port, out=out)
     parser.print_help(out)
     return 0
 

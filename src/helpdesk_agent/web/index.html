@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="helpdesk-token" content="__TOKEN__">
+  <title>Helpdesk agent (local)</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Helpdesk agent</h1>
+    <p class="note">Local only. Larkspur Labs is fictional; every user and device here is synthetic.</p>
+  </header>
+
+  <main>
+    <section class="card" aria-labelledby="ticket-heading">
+      <h2 id="ticket-heading">New ticket</h2>
+      <label for="requester">Requester</label>
+      <select id="requester" required></select>
+      <label for="ticket">Ticket</label>
+      <textarea id="ticket" rows="5" maxlength="8000" placeholder="Describe the problem"></textarea>
+      <div class="row">
+        <button id="send" type="button">Run ticket</button>
+        <span id="form-status" role="status"></span>
+      </div>
+    </section>
+
+    <section id="approval" class="card approval" hidden aria-live="assertive" aria-labelledby="approval-heading">
+      <h2 id="approval-heading">Approval required</h2>
+      <dl>
+        <dt>Tool</dt><dd id="p-tool"></dd>
+        <dt>Arguments</dt><dd><pre id="p-args"></pre></dd>
+        <dt>Effect</dt><dd id="p-effect"></dd>
+        <dt>Requester</dt><dd id="p-requester"></dd>
+        <dt>Target</dt><dd id="p-target"></dd>
+      </dl>
+      <p id="p-match"></p>
+      <div class="row">
+        <button id="approve" type="button" class="approve">Approve this write</button>
+        <button id="deny" type="button" class="deny">Deny</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="reply-heading">
+      <h2 id="reply-heading">Reply <span id="run-status" class="badge"></span></h2>
+      <p id="run-meta" class="meta"></p>
+      <div id="reply" class="reply"></div>
+      <p id="source" class="source" hidden></p>
+    </section>
+
+    <section class="card" aria-labelledby="calls-heading">
+      <h2 id="calls-heading">Tool calls</h2>
+      <table>
+        <colgroup>
+          <col class="c-num"><col class="c-tool"><col class="c-args"><col class="c-decision"><col class="c-reason">
+        </colgroup>
+        <thead><tr><th>#</th><th>Tool</th><th>Arguments</th><th>Decision</th><th>Reason</th></tr></thead>
+        <tbody id="calls"></tbody>
+      </table>
+      <p id="no-calls" class="meta">None yet.</p>
+    </section>
+  </main>
+</body>
+</html>
