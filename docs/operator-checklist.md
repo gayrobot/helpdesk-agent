@@ -36,6 +36,18 @@ None of this can start before the credits are on the account. Do it the day they
 **Console UI:** workspace, spend limit, rate limits, key creation.
 **1Password:** storing the key, expiry/rotation reminder, `op run` check.
 
+## 1b. Before Phase 7: the Okta org (added 2026-11-24)
+
+Skylar, by hand. Nothing uses it until Phase 8 (identity phase I5), but it's created early so the rewrite can be designed around it.
+
+- [ ] **Create an Okta Integrator Free Plan org** at developer.okta.com. Use it only for this project.
+- [ ] **Sign in with phishing-resistant MFA** on your own admin account (a passkey or WebAuthn key).
+- [ ] **Put nothing real in it.** Only the synthetic Larkspur users and groups, loaded later by a script from `directory.json`. No real people, no connections to other orgs, no production apps.
+- [ ] **Store the org URL in 1Password** (e.g. a new `HelpDeskAgent-Okta` item). Client IDs and the agent's private key go in the same item later and are referenced from `.env.tpl`; never paste them into a terminal, chat or file.
+- [ ] **Note:** `example.test` addresses can't receive activation email, so the synthetic users' passwords will be set by you, through the admin console or the seeding script.
+
+Claude Code never signs in to this org, never completes a device sign-in, and never creates or reads its credentials.
+
 ## 2. GitHub hygiene
 
 Checked with `gh api` on 2026-11-13 against `gayrobot/helpdesk-agent` (public). At Skylar's request, Claude turned on Dependabot alerts and required SHA pinning that day; everything else is unchanged. Settings live at GitHub → repo → Settings.
@@ -120,6 +132,8 @@ The subcommand names below follow `docs/plan.md`; the Phase 3 PR may change flag
 - [ ] **Check spend** in the Console against the cap, and review `evals/results/*.json` before committing them (synthetic data only, no key, no full prompts you wouldn't publish).
 
 ## 4. Phase 6: the project on its own subdomain, featured on damiano.dev
+
+> **Superseded on 2026-11-24.** The project is now a web app on a Cloudflare Worker (see "Sequence from Phase 6" in `docs/plan.md`); the static-site option below no longer applies, and this section's steps now belong to Phase 10. The token, environment, domain and review steps still apply.
 
 **Not before launch.** Phase 6 starts only after the live steps in section 3 are done and there are real eval numbers. Nothing here is built or created in Cloudflare before then.
 

@@ -1,8 +1,18 @@
-# Agent identity plan (Phases 7–12)
+# Agent identity plan (phases I1–I6)
 
 Written 2026-11-24 for Skylar (@gayrobot). Checked against `gayrobot/helpdesk-agent` at `fb958e7` (2026-11-20, Phase 5 merged). If `main` has moved, re-read `docs/plan.md`, `governance.py`, `tools.py` and `retrieval.py` before starting.
 
 This extends the existing project. It doesn't replace anything. Every rule in `CLAUDE.md` still applies: synthetic data only, no secrets anywhere, PRs only, exact pins with a dependency review, key-free CI, and Claude Code never answers the write gate.
+
+## Sequencing update (2026-11-24)
+
+This plan now runs as **Phase 8** of `docs/plan.md`, after the TypeScript rewrite on Cloudflare Workers (Phase 7). Read it with these changes:
+
+- **Language.** Everything here is built in the TypeScript code under `web/`, not the Python package. Python names below mean their TypeScript equivalents: `identity.py` and `authz.py` become modules, `Gate`, `Principal` and `Retriever` keep their roles, and `helpdesk-agent audit verify` becomes a script or eval-runner command. The `--as` flag applies to the local eval runner and dev tools; on the site, the principal comes from the session.
+- **Okta (I5) is in scope**, not optional. The dev issuer stays for unit tests and CI, which can't sign in to Okta.
+- **The dependency review compares TypeScript options:** Web Crypto used directly (built into Workers) against a JOSE library such as `jose`. Prefer the smaller option that still pins algorithms strictly.
+- **Per-session state.** The fake directory, the `jti` replay cache and the audit chain live in the session's Durable Object, so one visitor can't affect another.
+- **Phase numbers.** The identity phases are now I1–I6, so they don't clash with the project's own phase numbers.
 
 ## The question this answers
 
@@ -20,13 +30,13 @@ When the agent acts, three things should be provable: **who asked, what acted fo
 
 Be straight about this in the code comments and in the write-up.
 
-- **Phases 7 to 10 use a local dev issuer.** It mints a token for any synthetic user on request, so `--as jamie@example.test` is still an assertion, exactly as trustworthy as `--requester` is now. What these phases prove is the **enforcement side**: nothing downstream of the harness acts without a valid, correctly scoped, unexpired token, and the tests attack that.
-- **Phase 11 (Okta) is where authentication becomes real**: a person signs in, and a real authorization server decides what the agent may hold.
-- **Everything runs in one process until Phase 12.** Token checks inside one process protect against bugs and against the model steering the harness. They don't protect against a compromised harness. Phase 12 puts the tools behind a real network boundary.
+- **I1 to I4 use a local dev issuer.** It mints a token for any synthetic user on request, so `--as jamie@example.test` is still an assertion, exactly as trustworthy as `--requester` is now. What these phases prove is the **enforcement side**: nothing downstream of the harness acts without a valid, correctly scoped, unexpired token, and the tests attack that.
+- **I5 (Okta) is where authentication becomes real**: a person signs in, and a real authorization server decides what the agent may hold.
+- **Agent and tools share one deployment until I6.** Token checks inside one process protect against bugs and against the model steering the harness. They don't protect against a compromised harness. I6 puts the tools behind a real network boundary.
 
 ## Principals
 
-| Principal | Identifier | Local (Phases 7 to 10) | Okta (Phase 11) |
+| Principal | Identifier | Local (I1 to I4) | Okta (I5) |
 | --- | --- | --- | --- |
 | Requester | Directory email, as `sub` | Dev issuer mints a subject token | Device Authorization grant |
 | Agent | Client ID `helpdesk-agent`, as `act.sub` | Signs a client assertion with a key generated in memory at start | Service app using `private_key_jwt` |
@@ -116,13 +126,13 @@ Same rule as `docs/plan.md`: finish and verify one before starting the next. Eac
 
 | Phase | What | Done when |
 | --- | --- | --- |
-| 7 | Verified requester. `identity.py` (dev issuer, verifier, `Principal`), `--as` replaces `--requester`, `Gate` takes a `Principal`, `authz.py` with the read and may-request rules, `plan.md` and `CLAUDE.md` amended, dependency review merged | No code path builds a `Principal` from a bare string. Every rule has a unit test with bypass attempts. All 62 existing tickets still score as before. |
-| 8 | Delegated tokens. Token exchange, one scope and audience per call, 60-second expiry, `jti` replay cache, handlers refuse without a valid grant | Every attack in the test list below fails closed and is audited |
-| 9 | Permission-filtered retrieval, as above | Leak count is zero for every retriever, asserted in CI. Recall@3 and MRR reported per audience. |
-| 10 | Approver identity, separation of duties, approval receipts, audit hash chain and `audit verify` | Self-approval and approve-then-swap are refused in tests. `audit verify` catches an edited line and a deleted line. |
-| 10 **live** | Run the full eval with the new categories | Results file with old and new categories, cost and latency next to the Phase 5 numbers |
-| 11 (optional, live) | Okta as the issuer | A real sign-in drives the MFA ticket end to end, and the same tests pass against Okta-issued tokens |
-| 12 (optional) | Directory tools behind an HTTP MCP server that validates tokens itself | A token with the wrong audience is refused by the server process, not by the agent's own code |
+| I1 | Verified requester. `identity.py` (dev issuer, verifier, `Principal`), `--as` replaces `--requester`, `Gate` takes a `Principal`, `authz.py` with the read and may-request rules, `plan.md` and `CLAUDE.md` amended, dependency review merged | No code path builds a `Principal` from a bare string. Every rule has a unit test with bypass attempts. All 62 existing tickets still score as before. |
+| I2 | Delegated tokens. Token exchange, one scope and audience per call, 60-second expiry, `jti` replay cache, handlers refuse without a valid grant | Every attack in the test list below fails closed and is audited |
+| I3 | Permission-filtered retrieval, as above | Leak count is zero for every retriever, asserted in CI. Recall@3 and MRR reported per audience. |
+| I4 | Approver identity, separation of duties, approval receipts, audit hash chain and `audit verify` | Self-approval and approve-then-swap are refused in tests. `audit verify` catches an edited line and a deleted line. |
+| I4 **live** | Run the full eval with the new categories | Results file with old and new categories, cost and latency next to the Phase 5 numbers |
+| I5 (live) | Okta as the issuer | A real sign-in drives the MFA ticket end to end, and the same tests pass against Okta-issued tokens |
+| I6 (optional) | Directory tools behind an HTTP MCP server that validates tokens itself | A token with the wrong audience is refused by the server process, not by the agent's own code |
 
 ## Tests that must exist (bypass attempts)
 
@@ -147,7 +157,7 @@ Ticket set and scorer first, key-free, as in Phase 5. Add `forbidden_runbooks` a
 
 Signing and verifying need an asymmetric crypto library; the standard library has none. Write `docs/dependency-reviews/<name>.md` before adding anything. Compare PyJWT with `cryptography`, `joserfc` and Authlib on maintainers, release history, what each pulls in, and how each pins algorithms. Don't take a version number from this document. Resolve one that passes the 7-day cooldown.
 
-## Phase 11 notes: Okta
+## I5 notes: Okta
 
 Checked on 2026-11-24. Re-check against Okta's current docs before building.
 
@@ -158,11 +168,11 @@ Checked on 2026-11-24. Re-check against Okta's current docs before building.
 - New secrets (org URL, client ID, the agent's private key) go in 1Password and are referenced from `.env.tpl`, same as the API key.
 - **Skylar only:** creating the org, apps, authorization server and policies; every device sign-in; every approval. Add these to `docs/operator-checklist.md`. Claude Code never completes a sign-in.
 
-## Phase 12 notes: MCP
+## I6 notes: MCP
 
 The [MCP authorization spec](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) (revision 2026-07-28 at the time of writing; check for a newer one) treats a protected MCP server as an OAuth 2.1 resource server and requires it to publish Protected Resource Metadata (RFC 9728). Move `lookup_user`, `list_devices`, `reset_mfa` and `add_to_group` behind one. The server validates audience and scope itself and never passes a token on. This needs an MCP SDK dependency and its own review.
 
-## Additions to CLAUDE.md (in the Phase 7 PR)
+## Additions to CLAUDE.md (in the I1 PR)
 
 - Tokens, receipts and signing keys never appear in code, logs, commits, PRs, prompts or tool results. Log `jti`, never the token.
 - The dev issuer's key exists only in memory. Tests generate their own keys.
@@ -175,10 +185,10 @@ Multi-tenant identity binding (one fictional company), Cedar or another policy l
 
 ## Decisions for Skylar
 
-1. **Order.** Recommended: publish Phase 6 (the write-up with the real eval numbers) first, then start Phase 7, and add identity to the write-up when Phase 10 is live. The alternative holds the write-up back for weeks.
+1. **Order.** Decided 2026-11-24: identity comes after the TypeScript rewrite and before the public site, and the write-up comes last. See `docs/plan.md`.
 2. **Approver group.** Recommended: reuse `it-support`. The alternative is a new `helpdesk-operators` group.
 3. **Directory card.** Is name, department, title, manager and status the right amount for a colleague to see?
-4. **Okta phase.** Recommended: yes, after Phase 10. It adds real credentials to look after, and it's the part that turns a mock into real authentication.
+4. **Okta phase.** Decided 2026-11-24: in scope. Skylar creates the org before Phase 7.
 
 ## Standards referenced
 
