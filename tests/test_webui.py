@@ -85,6 +85,7 @@ def make_server_with(tmp_path):
     servers = []
 
     def _make(script, **kwargs):
+        kwargs.setdefault("min_review", 0)  # tests click at once unless they test the delay
         state = WebState(
             FakeClient(script),
             port=0,
@@ -408,3 +409,80 @@ def test_no_response_carries_the_environment(make_server_with, monkeypatch):
     )
     bodies.append(server.finished(run_id))
     assert all(sentinel not in json.dumps(b) for b in bodies)
+
+
+# ---------------------------------------------------------------- double-click guard
+
+
+def test_approve_too_soon_after_display_is_refused(make_server_with, audit):
+    server = make_server_with(_write_script(), min_review=0.3)
+    run_id = server.start()
+    pending = server.wait(run_id, lambda s: s["pending"] is not None)["pending"]
+    path = f"/api/runs/{run_id}/decision"
+    body = {"proposal_id": pending["id"], "decision": "approve"}
+    assert server.request("POST", path, body)[0] == 409
+    assert server.snapshot(run_id)["pending"]["id"] == pending["id"]  # still waiting
+    time.sleep(0.35)
+    assert server.request("POST", path, body)[0] == 200
+    server.finished(run_id)
+    assert [r["event"] for r in audit()] == ["write_approved", "tool_call"]
+
+
+def test_approve_before_the_page_saw_it_is_refused(make_server_with):
+    # shown_at is set by the first snapshot; an id guessed or read elsewhere can't skip it.
+    server = make_server_with(_write_script(), min_review=0.0)
+    run_id = server.start()
+    deadline = time.monotonic() + 5
+    run = server.state.runs[run_id]
+    while run.pending is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert server.state.decide(run_id, run.pending.id, approve=True) is False
+    assert server.state.decide(run_id, run.pending.id, approve=False) is True  # Deny always works
+    server.finished(run_id)
+
+
+def test_double_click_cannot_approve_the_next_write(make_server_with, audit):
+    two_writes = [
+        message(
+            [
+                tool_use("reset_mfa", {"email": "jamie@example.test"}, "toolu_a"),
+                tool_use(
+                    "add_to_group", {"email": "jamie@example.test", "group": "design"}, "toolu_b"
+                ),
+            ],
+            "tool_use",
+        ),
+        DONE,
+    ]
+    server = make_server_with(two_writes, min_review=0.5)
+    run_id = server.start()
+    first = server.wait(run_id, lambda s: s["pending"] is not None)["pending"]
+    path = f"/api/runs/{run_id}/decision"
+    assert server.request("POST", path, {"proposal_id": first["id"], "decision": "deny"})[0] == 200
+
+    second = server.wait(
+        run_id, lambda s: s["pending"] is not None and s["pending"]["id"] != first["id"]
+    )["pending"]
+    assert second["tool"] == "add_to_group"
+    # The second click of a double-click, on either id, decides nothing.
+    for pid in (first["id"], second["id"]):
+        assert server.request("POST", path, {"proposal_id": pid, "decision": "approve"})[0] == 409
+    assert server.snapshot(run_id)["pending"]["id"] == second["id"]
+
+    server.request("POST", path, {"proposal_id": second["id"], "decision": "deny"})
+    final = server.finished(run_id)
+    assert [e["decision"] for e in final["events"]] == ["denied_by_human", "denied_by_human"]
+    assert "write_approved" not in [r["event"] for r in audit()]
+
+
+def test_current_run_lets_a_reloaded_page_resume(make_server_with):
+    server = make_server_with(_write_script())
+    assert server.request("GET", "/api/current")[1] == {"run_id": None}
+    assert server.request("GET", "/api/current", token=False)[0] == 403
+    run_id = server.start()
+    assert server.request("GET", "/api/current")[1] == {"run_id": run_id}
+    pending = server.wait(run_id, lambda s: s["pending"] is not None)["pending"]
+    server.request(
+        "POST", f"/api/runs/{run_id}/decision", {"proposal_id": pending["id"], "decision": "deny"}
+    )
+    server.finished(run_id)

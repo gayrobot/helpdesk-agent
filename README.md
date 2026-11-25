@@ -55,7 +55,7 @@ op run --env-file=.env.tpl -- uv run helpdesk-agent eval
 op run --env-file=.env.tpl -- uv run helpdesk-agent serve
 ```
 
-It binds to `127.0.0.1` only and runs one ticket at a time. Every rule still runs in the same governance gate; the page only replaces typing `y`. Each proposal has a one-time id, and a write runs only after Approve is clicked on that proposal. A deny, a 5-minute timeout or stopping the server all deny. API calls need a per-process token and this page's own origin, so other sites open in the same browser can't drive it. The key stays in the server process.
+It binds to `127.0.0.1` only and runs one ticket at a time. Every rule still runs in the same governance gate; the page only replaces typing `y`. Each proposal has a one-time id, and a write runs only after Approve is clicked on that proposal. A deny, a 5-minute timeout or stopping the server all deny. Approve unlocks only after a proposal has been on screen for a second, so a double-click can't approve a second write. API calls need a per-process token and this page's own origin, so other sites open in the same browser can't drive it. The key stays in the server process. It does not stop another program running as you on this machine, which could read the token from the page; the terminal prompt refused anything but a real keyboard, so stop `serve` when you're not using it. Reloading the page picks up a run that is still waiting for a decision.
 
 `--dry-run` on the live commands prints what would be sent and needs no key. Each model call is logged to `logs/calls.jsonl` (model, request ID, tokens, cost, latency, stop reason) and each tool call to `logs/audit.jsonl`.
 

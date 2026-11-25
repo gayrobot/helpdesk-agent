@@ -36,6 +36,7 @@ Purpose: let Skylar see the existing agent work. It is a viewer over the Python 
 - Write proposals show the same fields as the terminal prompt (tool, exact arguments, effect, requester, target, the mismatch flag) with Approve and Deny buttons. Approve runs only from a fresh click by Skylar on that proposal; one proposal per click, no "approve all". Claude Code never clicks Approve.
 - Every governance rule still runs in `Gate`; the UI only replaces how `y` is typed. Audit and call logs are written as they are today.
 - Also before Phase 7: one full 62-ticket run on current `main`. It becomes the parity baseline.
+  - Done 2026-11-25 on `3a5c326`: [`evals/results/2026-11-25T153205Z.json`](../evals/results/2026-11-25T153205Z.json), 61/62 (only E025 `howto` failed: escalated instead of citing a runbook), $0.63, 309 s total. This file is the Phase 7 baseline.
 
 ### Phase 7: TypeScript rewrite on Cloudflare Workers
 

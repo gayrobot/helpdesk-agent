@@ -4,6 +4,8 @@
 
 const TOKEN = document.querySelector('meta[name="helpdesk-token"]').content;
 const POLL_MS = 700;
+// Matches MIN_REVIEW_SECONDS on the server, which refuses an earlier Approve anyway.
+const REVIEW_MS = 1200;
 const $ = (id) => document.getElementById(id);
 
 let runId = null;
@@ -127,9 +129,13 @@ function renderProposal(p) {
   setText(match, p.requester_is_target
     ? "The requester is the target."
     : "REQUESTER IS NOT THE TARGET: check they may ask for this.");
-  $("approve").disabled = false;
+  // Approve stays locked for a moment so a double-click can't approve a write that just
+  // appeared under the cursor. Deny is safe to allow at once.
+  $("approve").disabled = true;
   $("deny").disabled = false;
   box.hidden = false;
+  const id = p.id;
+  setTimeout(() => { if (shownProposal === id) $("approve").disabled = false; }, REVIEW_MS);
 }
 
 async function decide(decision) {
@@ -148,4 +154,14 @@ document.addEventListener("DOMContentLoaded", () => {
   $("approve").addEventListener("click", () => decide("approve"));
   $("deny").addEventListener("click", () => decide("deny"));
   loadRequesters();
+  resumeCurrentRun();
 });
+
+// After a reload, pick up a run that is still going (it may be waiting for a decision).
+async function resumeCurrentRun() {
+  const { ok, data } = await api("GET", "/api/current");
+  if (!ok || !data.run_id) return;
+  runId = data.run_id;
+  $("send").disabled = true;
+  poll();
+}

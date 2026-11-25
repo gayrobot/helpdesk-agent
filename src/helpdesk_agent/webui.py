@@ -30,6 +30,7 @@ import re
 import secrets
 import sys
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -49,6 +50,9 @@ from helpdesk_agent.tools import display
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 APPROVAL_TIMEOUT_SECONDS = 300.0
+# An Approve counts only once the proposal has been on the page this long, so a
+# double-click can't approve a second write that appeared under the cursor.
+MIN_REVIEW_SECONDS = 1.0
 MAX_BODY_BYTES = 16_384
 MAX_TICKET_CHARS = 8_000
 MAX_PANEL_CHARS = 300
@@ -98,6 +102,7 @@ class PendingApproval:
     fields: dict[str, Any]
     event: threading.Event = field(default_factory=threading.Event)
     decision: bool | None = None
+    shown_at: float | None = None  # monotonic time it was first sent to the page
 
 
 @dataclass
@@ -116,6 +121,8 @@ class Run:
         with self.lock:
             pending = None
             if self.pending is not None and self.pending.decision is None:
+                if self.pending.shown_at is None:
+                    self.pending.shown_at = time.monotonic()
                 pending = {"id": self.pending.id, **self.pending.fields}
             return {
                 "run_id": self.id,
@@ -162,6 +169,7 @@ class WebState:
         call_log: CallLog | None = None,
         escalation_dir: Path = DEFAULT_ESCALATION_DIR,
         approval_timeout: float = APPROVAL_TIMEOUT_SECONDS,
+        min_review: float = MIN_REVIEW_SECONDS,
     ) -> None:
         self.client = client
         self.port = port
@@ -170,6 +178,7 @@ class WebState:
         self.call_log = call_log or CallLog()
         self.escalation_dir = escalation_dir
         self.approval_timeout = approval_timeout
+        self.min_review = min_review
         self.token = secrets.token_urlsafe(32)
         self.runs: dict[str, Run] = {}
         self.current: Run | None = None
@@ -290,7 +299,8 @@ class WebState:
 
     def decide(self, run_id: str, proposal_id: Any, approve: bool) -> bool:
         """Record one decision for the pending proposal. False if there is none, the id
-        doesn't match, or it was already decided."""
+        doesn't match, it was already decided, or (for Approve only) the page hasn't
+        shown it for ``min_review`` seconds yet. Deny always counts at once."""
         run = self.runs.get(run_id)
         if run is None or not isinstance(proposal_id, str):
             return False
@@ -300,6 +310,10 @@ class WebState:
                 return False
             if not hmac.compare_digest(pending.id.encode(), proposal_id.encode()):
                 return False
+            if approve:
+                shown = pending.shown_at
+                if shown is None or time.monotonic() - shown < self.min_review:
+                    return False
             pending.decision = approve
             pending.event.set()
             return True
@@ -394,6 +408,10 @@ def make_handler(state: WebState) -> type[BaseHTTPRequestHandler]:
                 return self._error(HTTPStatus.FORBIDDEN, "Missing or wrong token.")
             if path == "/api/requesters":
                 return self._json(HTTPStatus.OK, {"requesters": state.requesters})
+            if path == "/api/current":
+                # Lets a reloaded page pick up a run that is waiting for a decision.
+                current = state.current
+                return self._json(HTTPStatus.OK, {"run_id": current.id if current else None})
             match = _RUN_PATH.match(path)
             if match and match.group(1) in state.runs:
                 return self._json(HTTPStatus.OK, state.runs[match.group(1)].snapshot())
@@ -426,7 +444,11 @@ def make_handler(state: WebState) -> type[BaseHTTPRequestHandler]:
                     return self._error(HTTPStatus.BAD_REQUEST, "decision is approve or deny.")
                 ok = state.decide(match.group(1), data.get("proposal_id"), choice == "approve")
                 if not ok:
-                    return self._error(HTTPStatus.CONFLICT, "No such pending proposal.")
+                    return self._error(
+                        HTTPStatus.CONFLICT,
+                        "No such pending proposal, or Approve was clicked before it had been "
+                        "on screen for a moment.",
+                    )
                 return self._json(HTTPStatus.OK, {"recorded": choice})
 
             return self._error(HTTPStatus.NOT_FOUND, "Not found.")
