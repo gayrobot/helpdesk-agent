@@ -1,0 +1,13 @@
+{
+  // The core and the Worker against Workers types (DurableObject, ExportedHandler, ...).
+  // This can't keep Node globals out: the Anthropic SDK's types pull in undici-types,
+  // which references Node's. test/runtime.test.ts (a source scan) and
+  // test/worker-smoke.test.ts (running the Worker in workerd) are the guards for that.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types"],
+    "lib": ["es2024"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/node/**"]
+}

@@ -9,18 +9,22 @@
     "node": ">=24.11.0 <25"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test": "node --test --test-reporter=spec \"test/**/*.test.ts\"",
-    "check": "npm run lint && npm run typecheck && npm test",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build:worker",
     "eval-retrieval": "node src/node/eval-retrieval.ts",
-    "eval": "node src/node/eval.ts"
+    "eval": "node src/node/eval.ts",
+    "dev:worker": "node src/node/dev-worker.ts",
+    "build:worker": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
+    "@cloudflare/workers-types": "5.20261117.1",
     "@types/node": "24.19.2",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "wrangler": "4.164.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.10.0"

@@ -1,0 +1,17 @@
+// Local development only until Phase 10 (deploys go through GitHub Actions then).
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "helpdesk-agent",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  // nodejs_compat fills process.env from bindings, so the Anthropic SDK reads the key
+  // itself and no code here ever handles it.
+  "compatibility_flags": ["nodejs_compat"],
+  "send_metrics": false,
+  "workers_dev": false,
+  "preview_urls": false,
+  // Locally the key comes only from the environment that `op run` sets: wrangler reads a
+  // required secret from process.env. Never put it in .dev.vars or any other file.
+  "secrets": { "required": ["ANTHROPIC_API_KEY"] },
+  "dev": { "ip": "127.0.0.1" }
+}
