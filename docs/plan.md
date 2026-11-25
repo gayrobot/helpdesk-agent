@@ -38,7 +38,8 @@ Purpose: let Skylar see the existing agent work. It is a viewer over the Python 
 - Write proposals show the same fields as the terminal prompt (tool, exact arguments, effect, requester, target, the mismatch flag) with Approve and Deny buttons. Approve runs only from a fresh click by Skylar on that proposal; one proposal per click, no "approve all". Claude Code never clicks Approve.
 - Every governance rule still runs in `Gate`; the UI only replaces how `y` is typed. Audit and call logs are written as they are today.
 - Also before Phase 7: one full 62-ticket run on current `main`. It becomes the parity baseline.
-  - Done 2026-11-25 on `3a5c326`: [`evals/results/2026-11-25T153205Z.json`](../evals/results/2026-11-25T153205Z.json), 61/62 (only E025 `howto` failed: escalated instead of citing a runbook), $0.63, 309 s total. This file is the Phase 7 baseline.
+  - **Baseline of record:** [`evals/results/2026-11-25T162514Z.json`](../evals/results/2026-11-25T162514Z.json), run 2026-11-25 with `eval --grade` on the code merged to `main` as `311430b` (PR #21). Deterministic checks 62/62; Haiku grader 9/14 how-to answers pass (answers_question 13/14, grounded 9/14, no_contradiction 14/14). Cost $0.634 agent + $0.0035 grader, 297 s total. Phase 7 is compared against this file, grader included.
+  - Noise sample: [`evals/results/2026-11-25T153205Z.json`](../evals/results/2026-11-25T153205Z.json), same agent code on `3a5c326`, no grader: 61/62 (E025 `howto` failed; it passed in the run above), $0.63. Treat one ticket either way as run-to-run noise when comparing.
 
 ### Phase 7: TypeScript rewrite on Cloudflare Workers
 
