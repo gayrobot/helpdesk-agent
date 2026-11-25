@@ -4,7 +4,9 @@
 // test_prompt_*). The TypeScript agent has no terminal prompt: approval comes from the
 // web page (slice 6, whose tests will cover the same rules: exact approval only, every
 // field passed through display(), the requester/target mismatch flag) and evals use
-// denyAll. The display() cases those tests relied on are kept below.
+// denyAll. Their rules are tested on the web approver in test/session-api.test.ts
+// (ts_web_approver_*, ts_only_an_explicit_approve_on_that_proposal_approves,
+// test_no_click_times_out_as_deny). The display() cases are kept below.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -73,15 +75,3 @@ test("ts_prototype_names_are_not_tools", () => {
     assert.equal(TOOLS.get(name), undefined);
   }
 });
-
-// The rules the terminal-prompt tests enforced, kept as placeholders so the web approver
-// (slice 6) can't ship without them. Each names the Python test it replaces.
-for (const [python, rule] of [
-  ["test_tty_approver_needs_exact_y", "only an explicit Approve on that proposal approves"],
-  ["test_tty_approver_denies_without_a_terminal", "no interactive operator means deny"],
-  ["test_prompt_shows_requester_next_to_target", "the page shows requester next to target"],
-  ["test_prompt_flags_requester_target_mismatch", "the page flags requester != target"],
-  ["test_prompt_strips_escapes_from_every_field", "every shown field goes through display()"],
-] as const) {
-  test.todo(`${python}: ${rule} (web approver, slice 6)`);
-}

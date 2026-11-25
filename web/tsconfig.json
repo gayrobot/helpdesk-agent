@@ -22,5 +22,5 @@
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
   // The Worker entry uses Workers types; tsconfig.worker.json checks it.
-  "exclude": ["src/worker/**"]
+  "exclude": ["src/worker/**", "test/worker/**"]
 }

@@ -63,6 +63,18 @@ Each tool call on the page can be expanded to show the exact result sent back to
 uv run python -c "from helpdesk_agent.governance import Gate, deny_all, result_fingerprint as f; from helpdesk_agent.directory import Directory; from helpdesk_agent.audit import AuditLog; from pathlib import Path; o = Gate(Directory.load(), deny_all, AuditLog(Path('/dev/null')), 'CHECK', 'eli.novak@example.test').execute('lookup_user', {'email': 'eli.novak@example.test'}); print(o.content); print(*f(o.content))"
 ```
 
+### TypeScript and the Cloudflare Worker (Phase 7)
+
+`web/` is the agent rewritten in TypeScript, at parity with the Python one (see the parity bar in [docs/plan.md](docs/plan.md)). The same page runs as a Cloudflare Worker, with one Durable Object per browser session holding that session's copy of the directory, its audit trail and its approval state:
+
+```bash
+op run --env-file=.env.tpl -- npm --prefix web run dev:worker
+```
+
+It runs locally only, on `http://127.0.0.1:8787/`. Wrangler reads the key from the environment `op run` sets (never a file), and the SDK inside the Worker reads it from there. The launcher turns off the devtools inspector and wrangler's local explorer API. The approval rules are the same as the Python page's. Unlike the Python page, a session keeps its directory changes from one ticket to the next, and if the Worker restarts mid-run, the run is marked interrupted and any waiting write is not made.
+
+Key-free checks: `cd web && npm ci && npm run check`. The TypeScript eval is `op run --env-file=.env.tpl -- npm --prefix web run eval`.
+
 `--dry-run` on the live commands prints what would be sent and needs no key. Each model call is logged to `logs/calls.jsonl` (model, request ID, tokens, cost, latency, stop reason) and each tool call to `logs/audit.jsonl`.
 
 ## License

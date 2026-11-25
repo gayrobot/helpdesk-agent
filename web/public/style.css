@@ -1,0 +1,120 @@
+:root {
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --text: #1c2027;
+  --muted: #5b6472;
+  --border: #d9dde3;
+  --accent: #2f5fd0;
+  --ok: #1f7a4d;
+  --warn: #a3470d;
+  --bad: #b42318;
+  --warn-bg: #fff4e5;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --card: #1d2026;
+    --text: #e6e8ec;
+    --muted: #9aa3b0;
+    --border: #343944;
+    --accent: #7ea2ff;
+    --ok: #5cc98e;
+    --warn: #f3a35c;
+    --bad: #ff8a80;
+    --warn-bg: #2e2416;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+header, main { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+header { padding-top: 24px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; }
+h2 { font-size: 1.05rem; margin: 0 0 12px; display: flex; gap: 8px; align-items: center; }
+.note, .meta { color: var(--muted); margin: 0 0 16px; font-size: 0.9rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+label { display: block; font-weight: 600; margin: 8px 0 4px; }
+select, textarea {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+textarea { resize: vertical; }
+
+.row { display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+
+button {
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.approve { background: var(--ok); border-color: var(--ok); }
+button.deny { background: transparent; color: var(--bad); border-color: var(--bad); }
+
+.approval { border: 2px solid var(--warn); background: var(--warn-bg); }
+.approval dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+.approval dt { font-weight: 600; }
+.approval dd { margin: 0; overflow-wrap: anywhere; }
+.match { color: var(--ok); font-weight: 600; }
+.mismatch { color: var(--bad); font-weight: 700; }
+
+pre { margin: 0; font: 0.85rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.reply { white-space: pre-wrap; overflow-wrap: anywhere; }
+.source { margin: 12px 0 0; font-weight: 600; color: var(--accent); }
+
+.badge { font-size: 0.8rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+.badge:empty { display: none; }
+.badge[data-status="answered"] { color: var(--ok); border-color: var(--ok); }
+.badge[data-status="escalated"] { color: var(--warn); border-color: var(--warn); }
+.badge[data-status="server_error"], .badge[data-status="api_error"], .badge[data-status="turn_limit"] { color: var(--bad); border-color: var(--bad); }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
+.c-num { width: 2.25rem; }
+.c-tool { width: 9rem; }
+.c-decision { width: 11rem; }
+.c-reason { width: 13rem; }
+tr.result-row td { border-top: none; padding-top: 0; }
+details summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+pre.result { margin-top: 8px; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; max-height: 24rem; overflow: auto; }
+.hash { margin: 6px 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; overflow-wrap: anywhere; }
+.altered { margin: 4px 0 0; color: var(--warn); }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+th { color: var(--muted); font-weight: 600; border-top: none; }
+tr[data-decision="denied_by_policy"] td, tr[data-decision="denied_by_human"] td { color: var(--bad); }
+tr[data-decision="approved"] td { color: var(--ok); }
+
+@media (max-width: 640px) {
+  thead { display: none; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  tr { border-top: 1px solid var(--border); padding: 6px 0; }
+  td { border: none; padding: 2px 0; }
+  tr.result-row td:first-child { display: none; }
+}
