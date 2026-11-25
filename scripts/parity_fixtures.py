@@ -43,6 +43,10 @@ ROOT = Path(__file__).resolve().parent.parent
 UNICODE_PATH = ROOT / "web" / "src" / "generated" / "unicode-py312.json"
 FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "governance.json"
 AGENT_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "agent.json"
+RETRIEVAL_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "retrieval.json"
+
+# The TypeScript port compares against BM25, the retriever the Python baseline runs used.
+os.environ["HELPDESK_RETRIEVER"] = "bm25"
 
 # Fixed clock for escalate ids and MFA reset dates. Whole milliseconds, so JavaScript's
 # Date can represent it exactly.
@@ -863,6 +867,118 @@ def agent_fixtures() -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------- retrieval (slice 4)
+
+MARKDOWN_CASES = [
+    "# Title\n\nIntro line.\n\n## First\n\nA.\n\n## Second\n\nB.\n",
+    "No title, just text.\n## Only section\nBody\n",
+    "\n\n# Late title\n## S\nx\n# Not a title now\nmore\n",
+    "# T\r\n## Windows line ends\r\nbody\r\n",
+    "# T\n## Café & Crème: Ünïcode — headings!!\nbody\n## \n\nempty heading\n",
+    "# T\n## Empty\n\n## Next\nx\n",
+    "#NoSpace\n##AlsoNoSpace\ntext\n### Third level stays in body\nmore\n",
+    "",
+    "   \n\t\n",
+]
+
+
+def _search_queries() -> list[str]:
+    """Every query the live Python agent sent to search_runbooks in the committed runs."""
+    seen: dict[str, None] = {}
+    for path in sorted((ROOT / "evals" / "results").glob("*.json")):
+        data = json.loads(path.read_text())
+        for ticket in data.get("tickets", []):
+            for event in ticket.get("transcript", {}).get("events", []):
+                if event.get("tool") == "search_runbooks" and isinstance(event.get("args"), dict):
+                    query = event["args"].get("query")
+                    if isinstance(query, str):
+                        seen[query] = None
+    return list(seen)
+
+
+def retrieval_fixtures() -> dict[str, Any]:
+    from helpdesk_agent.retrieval import (
+        BM25Retriever,
+        EmbeddingRetriever,
+        HybridRetriever,
+        chunk_markdown,
+        load_runbooks,
+        tokenize,
+    )
+    from helpdesk_agent.retrieval_eval import load_queries, score
+
+    class KeywordEmbedder:
+        VOCAB = ("vpn", "mfa", "okta", "password", "mac", "laptop", "wifi", "phishing", "group")
+
+        def embed(self, texts):
+            return [[float(w in t.lower()) for w in self.VOCAB] for t in texts]
+
+    chunks = load_runbooks()
+    bm25 = BM25Retriever(chunks)
+    hybrid = HybridRetriever([bm25, EmbeddingRetriever(chunks, KeywordEmbedder())])
+    eval_queries = load_queries(ROOT / "evals" / "retrieval.jsonl")
+    tickets = [
+        json.loads(line)["body"]
+        for line in (ROOT / "evals" / "tickets.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    agent_queries = _search_queries()
+    queries = (
+        [q["query"] for q in eval_queries]
+        + agent_queries
+        + tickets
+        + [
+            "zzzz qqqq",
+            "",
+            "the and of",
+            "GROUPS groups group's can't access",
+        ]
+    )
+
+    def ranked(retriever, query, k=10):
+        return [[c.id, s] for c, s in retriever.search(query, k)]
+
+    gate_cases = []
+    original = tools_module.datetime
+    tools_module.datetime = _FixedDatetime
+    try:
+        for query in [*agent_queries, "reset okta verify new phone", "zzzz qqqq"]:
+            gate_cases.append(
+                run_gate_case(
+                    {
+                        "name": f"search {query!r}"[:80],
+                        "requester": JAMIE,
+                        "approver": "deny",
+                        "steps": [{"tool": "search_runbooks", "args": {"query": query}}],
+                    }
+                )
+            )
+    finally:
+        tools_module.datetime = original
+    return {
+        "chunks": [
+            {
+                "id": c.id,
+                "runbook": c.runbook,
+                "title": c.title,
+                "section": c.section,
+                "text": c.text,
+            }
+            for c in chunks
+        ],
+        "chunk_markdown": [
+            {"markdown": md, "chunks": [c.__dict__ for c in chunk_markdown("doc", md)]}
+            for md in MARKDOWN_CASES
+        ],
+        "tokenize": [{"text": q, "tokens": tokenize(q)} for q in queries],
+        "bm25": [{"query": q, "ranked": ranked(bm25, q)} for q in queries],
+        "hybrid": [{"query": q, "ranked": ranked(hybrid, q, 5)} for q in queries[:60]],
+        "score": score(bm25, eval_queries).to_dict(),
+        "agent_query_count": len(agent_queries),
+        "gate": gate_cases,
+    }
+
+
 def render() -> dict[Path, str]:
     original = tools_module.datetime
     tools_module.datetime = _FixedDatetime
@@ -872,6 +988,8 @@ def render() -> dict[Path, str]:
         tools_module.datetime = original
     return {
         AGENT_FIXTURES_PATH: json.dumps(agent, ensure_ascii=True, indent=1) + "\n",
+        RETRIEVAL_FIXTURES_PATH: json.dumps(retrieval_fixtures(), ensure_ascii=True, indent=1)
+        + "\n",
         UNICODE_PATH: json.dumps(unicode_tables(), ensure_ascii=True, separators=(",", ":")) + "\n",
         FIXTURES_PATH: json.dumps(governance_fixtures(), ensure_ascii=True, indent=1) + "\n",
     }
