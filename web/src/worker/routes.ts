@@ -22,6 +22,15 @@ function randomHex(bytes: number): string {
     .join("");
 }
 
+/** `route`, with any unexpected error turned into a fixed 500 (never the error text). */
+export async function safeRoute(request: Request, env: Env): Promise<Response> {
+  try {
+    return await route(request, env);
+  } catch {
+    return json(500, { error: "Internal error." });
+  }
+}
+
 export async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);

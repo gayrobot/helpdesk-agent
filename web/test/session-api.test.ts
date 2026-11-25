@@ -582,3 +582,56 @@ test("ts_the_session_keeps_its_directory_between_tickets", async () => {
   assert.equal(profile.mfa.enrolled, false);
   assert.equal(s.store.directory?.users.find((u) => u.email === JAMIE)?.mfa.enrolled, false);
 });
+
+test("ts_log_route_returns_this_sessions_records", async () => {
+  const s = await makeSession(writeScript());
+  assert.equal((await s.request("GET", "/api/log", undefined, { token: false })).status, 403);
+  const runId = await s.start();
+  const pending = await s.pendingOf(runId);
+  await new Promise((r) => setTimeout(r, 1));
+  await s.decide(runId, { proposal_id: pending.id, decision: "approve" });
+  await s.finished(runId);
+  const log = (await s.request("GET", "/api/log")).data as {
+    audit: Record<string, unknown>[];
+    calls: Record<string, unknown>[];
+  };
+  // The approval is recorded before the write's own tool_call record.
+  assert.deepEqual(
+    log.audit.map((r) => [r.event, r.decision ?? null]),
+    [
+      ["write_approved", null],
+      ["tool_call", "approved"],
+    ],
+  );
+  assert.equal(log.calls.length, 2);
+  assert.ok(log.calls.every((c) => c.request_id === "req_fake" && Number(c.cost_usd) > 0));
+});
+
+test("ts_an_approved_write_survives_a_restart", async () => {
+  // Two writes in one turn: the first approved (and applied), the second still pending
+  // when the process goes away. The first must be stored; the second must not happen.
+  const store = new MemoryStore();
+  const first = await makeSession(
+    [
+      message(
+        [
+          toolUse("reset_mfa", { email: JAMIE }, "toolu_a"),
+          toolUse("add_to_group", { email: JAMIE, group: "design" }, "toolu_b"),
+        ],
+        "tool_use",
+      ),
+      DONE,
+    ],
+    { store },
+  );
+  const runId = await first.start();
+  const a = await first.pendingOf(runId);
+  assert.equal((await first.decide(runId, { proposal_id: a.id, decision: "approve" })).status, 200);
+  await first.waitFor(runId, (x) => x.pending !== null && x.pending.id !== a.id);
+
+  const second = await makeSession([], { store });
+  assert.equal((await second.snapshot(runId)).status, "interrupted");
+  const jamie = store.directory?.users.find((u) => u.email === JAMIE);
+  assert.equal(jamie?.mfa.enrolled, false); // the approved reset was kept
+  assert.ok(!jamie?.groups.includes("design")); // the pending add never ran
+});

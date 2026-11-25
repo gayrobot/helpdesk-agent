@@ -100,6 +100,7 @@ export async function handleSessionApi(
     if (!(await tokenOk(request, expectedHash))) return error(403, "Missing or wrong token.");
     if (path === "/api/requesters") return json(200, { requesters: session.requesters });
     if (path === "/api/current") return json(200, { run_id: session.currentRunId() });
+    if (path === "/api/log") return json(200, await session.log());
     const run = RUN_PATH.exec(path);
     const snap = run ? session.snapshot(run[1] as string) : null;
     return snap ? json(200, snap) : error(404, "Not found.");

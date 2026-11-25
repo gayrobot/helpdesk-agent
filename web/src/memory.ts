@@ -43,4 +43,7 @@ export class MemoryStore {
   async loadRuns() {
     return structuredClone(this.runs);
   }
+  async readLog() {
+    return { audit: structuredClone(this.audit), calls: structuredClone(this.calls) };
+  }
 }

@@ -4,7 +4,7 @@
 import type { BetaMessage } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 
 import type { MessagesClient } from "../../src/client.ts";
-import { type Env, route } from "../../src/worker/routes.ts";
+import { type Env, safeRoute } from "../../src/worker/routes.ts";
 import { sessionObjectClass } from "../../src/worker/session-object.ts";
 import { message, text, toolUse } from "../fakes.ts";
 
@@ -31,5 +31,5 @@ export const HelpdeskSession = sessionObjectClass(loopingClient, {
 });
 
 export default {
-  fetch: (request, env) => route(request, env),
+  fetch: (request, env) => safeRoute(request, env),
 } satisfies ExportedHandler<Env>;

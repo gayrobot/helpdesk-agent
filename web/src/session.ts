@@ -52,6 +52,8 @@ export interface SessionStore {
   loadDirectory(): Promise<RawDirectory | null>;
   saveRuns(runs: StoredRun[]): Promise<void>;
   loadRuns(): Promise<StoredRun[]>;
+  /** This session's audit records and call-log entries, oldest first. */
+  readLog(): Promise<{ audit: Record<string, unknown>[]; calls: Record<string, unknown>[] }>;
 }
 
 export interface StoredRun {
@@ -252,6 +254,11 @@ export class Session {
       record: async (event, fields) => {
         // Stored first: if that fails the gate fails closed, as with the audit file.
         await this.opts.store.appendAudit(buildRecord(event, fields, this.opts.clock()));
+        // An approved write has just changed the directory: store it now, so a restart
+        // can't lose a write the operator approved. A failure here fails the run.
+        if (event === "tool_call" && fields.decision === "approved") {
+          await this.opts.store.saveDirectory(this.directoryData());
+        }
         if (event !== "tool_call") return;
         staged.push({
           tool: safe(fields.tool, 64),
@@ -334,6 +341,11 @@ export class Session {
       events: [...run.events],
       pending,
     };
+  }
+
+  /** The session's own audit trail and call log (token-checked by the API). */
+  log() {
+    return this.opts.store.readLog();
   }
 
   hasRun(runId: string): boolean {

@@ -67,6 +67,13 @@ export class DurableStore implements SessionStore {
   async loadRuns(): Promise<StoredRun[]> {
     return (await this.storage.get<StoredRun[]>("runs")) ?? [];
   }
+
+  async readLog() {
+    const list = async (prefix: string) => [
+      ...(await this.storage.list<Record<string, unknown>>({ prefix: `${prefix}:` })).values(),
+    ];
+    return { audit: await list("audit"), calls: await list("calls") };
+  }
 }
 
 export interface SessionTimings {
@@ -87,6 +94,15 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
     }
 
     override async fetch(request: Request): Promise<Response> {
+      try {
+        return await this.handle(request);
+      } catch {
+        // A fixed message: never the exception text.
+        return json(500, { error: "Internal error." });
+      }
+    }
+
+    private async handle(request: Request): Promise<Response> {
       const hash = await this.ctx.storage.get<string>("token_hash");
       if (hash === undefined) return json(403, { error: "Unknown session." });
       if (!(await tokenOk(request, hash))) return json(403, { error: "Missing or wrong token." });

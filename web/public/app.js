@@ -152,7 +152,7 @@ function resultRow(e) {
   details.appendChild(pre);
   const meta = document.createElement("p");
   meta.className = "meta hash";
-  setText(meta, `sha256 ${hash} (matches result_sha256 in logs/audit.jsonl)`);
+  setText(meta, `sha256 ${hash} (matches result_sha256 in this session's audit log: GET /api/log)`);
   details.appendChild(meta);
   if (e.result_altered) {
     const warn = document.createElement("p");

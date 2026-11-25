@@ -12,14 +12,21 @@ import { parseArgs } from "node:util";
 
 export const HOST = "127.0.0.1";
 
-export async function startLocalWorker(port: number, configPath?: string) {
+/** `persist`: a folder for Durable Object state (default .wrangler/state; tests pass a
+ * temporary one, and pass the same one twice to simulate a restart). */
+export async function startLocalWorker(port: number, configPath?: string, persist?: string) {
   // Read by wrangler when the worker starts; set here so no one has to remember them.
   process.env.X_LOCAL_EXPLORER = "false";
   process.env.WRANGLER_SEND_METRICS = "false";
   const { unstable_startWorker } = await import("wrangler");
   const worker = await unstable_startWorker({
     config: configPath ?? new URL("../../wrangler.jsonc", import.meta.url).pathname,
-    dev: { inspector: false, server: { hostname: HOST, port }, watch: false },
+    dev: {
+      inspector: false,
+      server: { hostname: HOST, port },
+      watch: false,
+      ...(persist ? { persist } : {}),
+    },
   });
   await worker.ready;
   return worker;
