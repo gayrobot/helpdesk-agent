@@ -13,7 +13,7 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 | 4 ✅ | RAG over runbooks (see below) | Retrieval eval reports recall@3 and MRR for each retriever; agent answers cite the runbook |
 | 5 ✅ | Evals: 50–100 synthetic tickets in `evals/tickets.jsonl`, auto-deny approval stub, deterministic checks first, results in `evals/results/<date>.json` (see "Adversarial evals" below). Ticket set and scorer are built key-free. | Scorer passes on hand-written transcripts in CI |
 | 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
-| 6 | Local web UI over the Python agent (see "Sequence from Phase 6") | Skylar runs tickets in a browser on localhost, sees cited runbook answers, and approves or denies a write |
+| 6 ✅ | Local web UI over the Python agent (see "Sequence from Phase 6") | Skylar runs tickets in a browser on localhost, sees cited runbook answers, and approves or denies a write |
 | 7 | TypeScript rewrite on Cloudflare Workers, at parity with the Python agent | The parity bar below is met |
 | 8 | Agent identity, built in TypeScript with Okta: phases I1–I5 in [identity-plan.md](identity-plan.md) | Each identity phase's own "done when" |
 | 9 | Public site: anonymous limited chat, persona sign-in, per-user agent permissions | Checks below pass on a preview deploy |
@@ -26,6 +26,8 @@ The project is now a web app, not only a CLI. Order: see it work locally, rewrit
 **Before Phase 7 (Skylar):** create the Okta Integrator Free Plan org. See `docs/operator-checklist.md`. Nothing uses it until Phase 8 (I5), and it holds synthetic users only.
 
 ### Phase 6: local web UI
+
+Done 2026-11-25: Skylar ran a how-to ticket (cited runbook) and an MFA reset through the write gate live on `helpdesk-agent serve`.
 
 Purpose: let Skylar see the existing agent work. It is a viewer over the Python code, not the product, and it is retired when Phase 7 reaches parity.
 
