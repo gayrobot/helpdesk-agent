@@ -47,6 +47,7 @@ export function makeGate(
     audit?: MemoryAudit;
     escalations?: MemoryEscalations;
     ticketId?: string;
+    retriever?: Retriever;
   } = {},
 ) {
   const directory = options.directory ?? Directory.load();
@@ -57,7 +58,7 @@ export function makeGate(
     approver: options.approver ?? denyAll,
     audit,
     escalations,
-    retriever: new StubRetriever(),
+    retriever: options.retriever ?? new StubRetriever(),
     ticketId: options.ticketId ?? "T-TEST",
     requester: options.requester ?? JAMIE,
     clock: () => FIXED_NOW,
