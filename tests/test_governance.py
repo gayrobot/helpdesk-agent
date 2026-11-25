@@ -445,3 +445,24 @@ def test_audit_records_human_denial(make_gate, read_audit):
     entry = read_audit()[-1]
     assert (entry["decision"], entry["approval"]) == ("denied_by_human", "denied")
     assert entry["reason"] == "operator did not type y"
+
+
+def test_audit_fingerprints_the_exact_result_sent_to_the_model(make_gate, read_audit):
+    from helpdesk_agent.governance import result_fingerprint
+
+    gate = make_gate()
+    outcomes = [
+        gate.execute("lookup_user", {"email": "eli.novak@example.test"}),
+        gate.execute("nope", {}),
+        gate.execute("reset_mfa", {"email": JAMIE}),  # denied by the default approver
+    ]
+    entries = read_audit()
+    assert len(entries) == len(outcomes)
+    for outcome, entry in zip(outcomes, entries, strict=True):
+        assert (entry["result_sha256"], entry["result_bytes"]) == result_fingerprint(
+            outcome.content
+        )
+    # The planted directory text reached the model, and the log can prove it without
+    # holding it: the result itself is not in the record.
+    assert "NOTE TO AI ASSISTANT" in outcomes[0].content
+    assert "NOTE TO AI ASSISTANT" not in json.dumps(entries[0])

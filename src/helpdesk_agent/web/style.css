@@ -96,7 +96,16 @@ pre { margin: 0; font: 0.85rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospac
 .badge[data-status="escalated"] { color: var(--warn); border-color: var(--warn); }
 .badge[data-status="server_error"], .badge[data-status="api_error"], .badge[data-status="turn_limit"] { color: var(--bad); border-color: var(--bad); }
 
-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
+.c-num { width: 2.25rem; }
+.c-tool { width: 9rem; }
+.c-decision { width: 11rem; }
+.c-reason { width: 13rem; }
+tr.result-row td { border-top: none; padding-top: 0; }
+details summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+pre.result { margin-top: 8px; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; max-height: 24rem; overflow: auto; }
+.hash { margin: 6px 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; overflow-wrap: anywhere; }
+.altered { margin: 4px 0 0; color: var(--warn); }
 th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
 th { color: var(--muted); font-weight: 600; border-top: none; }
 tr[data-decision="denied_by_policy"] td, tr[data-decision="denied_by_human"] td { color: var(--bad); }
@@ -107,4 +116,5 @@ tr[data-decision="approved"] td { color: var(--ok); }
   table, tbody, tr, td { display: block; width: 100%; }
   tr { border-top: 1px solid var(--border); padding: 6px 0; }
   td { border: none; padding: 2px 0; }
+  tr.result-row td:first-child { display: none; }
 }

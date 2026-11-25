@@ -44,7 +44,13 @@ from helpdesk_agent.agent import Agent
 from helpdesk_agent.audit import DEFAULT_AUDIT_PATH, AuditLog
 from helpdesk_agent.client import CallLog, MessagesClient, ModelCaller
 from helpdesk_agent.directory import Directory
-from helpdesk_agent.governance import DEFAULT_ESCALATION_DIR, EMAIL_PATTERN, Gate, Proposal
+from helpdesk_agent.governance import (
+    DEFAULT_ESCALATION_DIR,
+    EMAIL_PATTERN,
+    Gate,
+    Outcome,
+    Proposal,
+)
 from helpdesk_agent.tools import display
 
 HOST = "127.0.0.1"
@@ -56,6 +62,7 @@ MIN_REVIEW_SECONDS = 1.0
 MAX_BODY_BYTES = 16_384
 MAX_TICKET_CHARS = 8_000
 MAX_PANEL_CHARS = 300
+MAX_RESULT_CHARS = 20_000  # tool results shown on the page (memory only, never logged)
 TOKEN_HEADER = "X-Helpdesk-Token"  # noqa: S105 (a header name, not a secret)
 
 # path -> (file in helpdesk_agent/web, content type)
@@ -156,6 +163,33 @@ class LiveAuditLog(AuditLog):
         self.sink(event, fields)
 
 
+class PanelGate(Gate):
+    """``Gate`` plus one step after each call: put the panel entry, with the exact
+    result text the model got back, on the page. Every check still runs in ``Gate``.
+
+    The audit sink stages the entry; it is published here, after the result is known,
+    so the page never shows a call without its result.
+    """
+
+    def __init__(self, *args: Any, run: Run, staged: list[dict[str, Any]], **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.run = run
+        self.staged = staged
+
+    def execute(self, name: str, args: Any) -> Outcome:
+        outcome = super().execute(name, args)
+        with self.run.lock:
+            entry = self.staged.pop() if self.staged else {"tool": _safe(name, 64)}
+            self.staged.clear()
+            shown = _safe(outcome.content, MAX_RESULT_CHARS)
+            entry["result"] = shown
+            # True when control characters were replaced or the text was cut, so the
+            # page copy isn't byte-identical to what the model got (the hash still is).
+            entry["result_altered"] = shown != outcome.content
+            self.run.events.append(entry)
+        return outcome
+
+
 class WebState:
     """Everything the HTTP handlers share. One ticket runs at a time."""
 
@@ -233,13 +267,16 @@ class WebState:
 
     def _work(self, run: Run, body: str) -> None:
         try:
-            gate = Gate(
+            staged: list[dict[str, Any]] = []
+            gate = PanelGate(
                 directory=self.directory_loader(),  # fresh copy per ticket, as in the CLI
                 approver=self._approver_for(run),
-                audit=LiveAuditLog(self.audit_path, self._sink_for(run)),
+                audit=LiveAuditLog(self.audit_path, self._sink_for(run, staged)),
                 ticket_id=run.ticket_id,
                 requester=run.requester,
                 escalation_dir=self.escalation_dir,
+                run=run,
+                staged=staged,
             )
             result = Agent(ModelCaller(self.client, self.call_log), gate).run(body)
             with run.lock:
@@ -253,7 +290,9 @@ class WebState:
                 run.final_text = "The run failed inside the server. Nothing more was attempted."
                 run.status = "server_error"
 
-    def _sink_for(self, run: Run) -> Callable[[str, dict[str, Any]], None]:
+    def _sink_for(
+        self, run: Run, staged: list[dict[str, Any]]
+    ) -> Callable[[str, dict[str, Any]], None]:
         def sink(event: str, fields: dict[str, Any]) -> None:
             if event != "tool_call":
                 return
@@ -265,9 +304,11 @@ class WebState:
                 "approval": fields.get("approval"),
                 "reason": _safe(fields.get("reason")),
                 "is_error": bool(fields.get("is_error")),
+                "result_sha256": fields.get("result_sha256"),
+                "result_bytes": fields.get("result_bytes"),
             }
             with run.lock:
-                run.events.append(entry)
+                staged.append(entry)
 
         return sink
 

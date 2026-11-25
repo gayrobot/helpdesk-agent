@@ -486,3 +486,46 @@ def test_current_run_lets_a_reloaded_page_resume(make_server_with):
         "POST", f"/api/runs/{run_id}/decision", {"proposal_id": pending["id"], "decision": "deny"}
     )
     server.finished(run_id)
+
+
+# ---------------------------------------------------------------- results on the page
+
+
+def test_panel_shows_the_exact_result_and_its_audit_fingerprint(make_server_with, audit):
+    from helpdesk_agent.governance import result_fingerprint
+
+    script = [
+        message([tool_use("lookup_user", {"email": "eli.novak@example.test"})], "tool_use"),
+        message([text("Escalating.")], "end_turn"),
+    ]
+    server = make_server_with(script)
+    run_id = server.start(ticket="password help", requester="eli.novak@example.test")
+    (event,) = server.finished(run_id)["events"]
+    assert "NOTE TO AI ASSISTANT" in event["result"]
+    assert json.loads(event["result"])["email"] == "eli.novak@example.test"
+    assert event["result_altered"] is False
+    (record,) = audit()
+    assert (event["result_sha256"], event["result_bytes"]) == result_fingerprint(event["result"])
+    assert record["result_sha256"] == event["result_sha256"]
+    assert "NOTE TO AI ASSISTANT" not in json.dumps(record)
+
+
+def test_every_panel_row_has_a_result(make_server_with):
+    script = [
+        message(
+            [
+                tool_use("nope", {}, "toolu_x"),
+                tool_use(
+                    "add_to_group", {"email": "jamie@example.test", "group": "admins"}, "toolu_y"
+                ),
+            ],
+            "tool_use",
+        ),
+        DONE,
+    ]
+    server = make_server_with(script)
+    run_id = server.start()
+    events = server.finished(run_id)["events"]
+    assert [e["decision"] for e in events] == ["unknown_tool", "denied_by_policy"]
+    assert events[0]["result"].startswith("Unknown tool")
+    assert events[1]["result"].startswith("Refused by policy")

@@ -13,10 +13,15 @@ Order of checks for every call, each audited:
 
 Nothing in the ticket, the directory or a tool result can change these rules: they are
 code, not prompt.
+
+Each audit record also carries ``result_sha256`` and ``result_bytes`` for the exact text
+returned to the model, so what the model saw can be proved later without logging it:
+rerun the call and compare fingerprints.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -92,6 +97,12 @@ class Outcome:
 
 
 Approver = Callable[[Proposal], bool]
+
+
+def result_fingerprint(content: str) -> tuple[str, int]:
+    """SHA-256 (hex) and UTF-8 length of a tool result, as recorded in the audit log."""
+    raw = content.encode("utf-8")
+    return hashlib.sha256(raw).hexdigest(), len(raw)
 
 
 # ---------------------------------------------------------------- approvers
@@ -327,8 +338,10 @@ class Gate:
         """Audit one tool call (rule 7) and build what goes back to the model.
 
         ``reason`` says why the policy decision came out as it did; for refusals and
-        errors it is the message the model sees.
+        errors it is the message the model sees. ``content`` itself isn't logged, only
+        its fingerprint.
         """
+        sha256, size = result_fingerprint(content)
         self.audit.record(
             "tool_call",
             ticket_id=self.ctx.ticket_id,
@@ -341,5 +354,7 @@ class Gate:
             approval=approval.value,
             is_error=error,
             summary=summary or content,
+            result_sha256=sha256,
+            result_bytes=size,
         )
         return Outcome(decision=decision, content=content, is_error=error)

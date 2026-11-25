@@ -93,11 +93,47 @@ function renderReply(text) {
   setText($("source"), sourceLine ? sourceLine.trim() : "");
 }
 
+function prettyResult(text) {
+  try { return JSON.stringify(JSON.parse(text), null, 2); } catch (_) { return text; }
+}
+
+// The exact text the model got back for one call, with the fingerprint that the audit
+// log records for it (logs/audit.jsonl: result_sha256, result_bytes).
+function resultRow(e) {
+  const tr = document.createElement("tr");
+  tr.className = "result-row";
+  tr.appendChild(document.createElement("td"));
+  const td = document.createElement("td");
+  td.colSpan = 4;
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const hash = e.result_sha256 || "";
+  setText(summary, `Result sent to the model · ${e.result_bytes ?? "?"} bytes · sha256 ${hash.slice(0, 12)}…`);
+  details.appendChild(summary);
+  const pre = document.createElement("pre");
+  pre.className = "result";
+  setText(pre, prettyResult(e.result ?? ""));
+  details.appendChild(pre);
+  const meta = document.createElement("p");
+  meta.className = "meta hash";
+  setText(meta, `sha256 ${hash} (matches result_sha256 in logs/audit.jsonl)`);
+  details.appendChild(meta);
+  if (e.result_altered) {
+    const warn = document.createElement("p");
+    warn.className = "meta altered";
+    setText(warn, "Shown with control characters replaced or cut for length; the hash is of the original.");
+    details.appendChild(warn);
+  }
+  td.appendChild(details);
+  tr.appendChild(td);
+  return tr;
+}
+
 function renderCalls(events) {
   const body = $("calls");
   $("no-calls").hidden = events.length > 0;
-  // Rows only ever get appended, so add the new ones.
-  for (let i = body.children.length; i < events.length; i++) {
+  // Calls only ever get appended, so add the new ones (two rows each).
+  for (let i = body.querySelectorAll("tr.call").length; i < events.length; i++) {
     const e = events[i];
     const tr = document.createElement("tr");
     const decision = e.approval === "approved" || e.approval === "denied"
@@ -110,7 +146,9 @@ function renderCalls(events) {
       tr.appendChild(td);
     });
     tr.dataset.decision = e.decision;
+    tr.className = "call";
     body.appendChild(tr);
+    body.appendChild(resultRow(e));
   }
 }
 
