@@ -19,5 +19,8 @@
     "@biomejs/biome": "2.6.8",
     "@types/node": "24.19.2",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.10.0"
   }
 }

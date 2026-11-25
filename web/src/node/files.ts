@@ -7,6 +7,7 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { type AuditSink, buildRecord } from "../audit.ts";
+import type { CallLog } from "../client.ts";
 import type { EscalationRecord, EscalationStore } from "../tools.ts";
 
 /** JSON with keys sorted at every level, like Python's `json.dumps(sort_keys=True)`. */
@@ -35,6 +36,23 @@ export class FileAudit implements AuditSink {
       `${sortedJson(buildRecord(event, fields, this.clock()))}\n`,
       "utf8",
     );
+  }
+}
+
+/** Appends one JSON line per model call, like Python's `logs/calls.jsonl`. */
+export class FileCallLog implements CallLog {
+  readonly path: string;
+  private readonly clock: () => Date;
+
+  constructor(path: string, clock: () => Date = () => new Date()) {
+    this.path = path;
+    this.clock = clock;
+  }
+
+  async write(entry: Record<string, unknown>): Promise<void> {
+    await mkdir(dirname(this.path), { recursive: true });
+    const line = { ts: this.clock().toISOString().replace("Z", "+00:00"), ...entry };
+    await appendFile(this.path, `${sortedJson(line)}\n`, "utf8");
   }
 }
 
