@@ -45,6 +45,9 @@ FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "governance.json"
 AGENT_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "agent.json"
 RETRIEVAL_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "retrieval.json"
 EVALS_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "evals.json"
+# The runbooks as data for the Worker, which can't read files at run time. Written from
+# src/helpdesk_agent/data/runbooks/; the drift check keeps it equal to the folder.
+RUNBOOKS_PATH = ROOT / "web" / "src" / "generated" / "runbooks.json"
 
 # The committed Python eval runs used as real model traffic for the fixtures. Named, not
 # globbed: new results files (including TypeScript runs, ts-*.json) must not change them.
@@ -1217,7 +1220,10 @@ def render() -> dict[Path, str]:
         agent = agent_fixtures()
     finally:
         tools_module.datetime = original
+    runbook_dir = ROOT / "src" / "helpdesk_agent" / "data" / "runbooks"
+    runbooks = {p.stem: p.read_text(encoding="utf-8") for p in sorted(runbook_dir.glob("*.md"))}
     return {
+        RUNBOOKS_PATH: json.dumps(runbooks, ensure_ascii=True, indent=1) + "\n",
         AGENT_FIXTURES_PATH: json.dumps(agent, ensure_ascii=True, indent=1) + "\n",
         RETRIEVAL_FIXTURES_PATH: json.dumps(retrieval_fixtures(), ensure_ascii=True, indent=1)
         + "\n",
