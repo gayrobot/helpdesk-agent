@@ -69,6 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_eval.add_argument("--category", action="append", help="Only these categories.")
     run_eval.add_argument("--limit", type=int, help="Only the first N tickets.")
     run_eval.add_argument("--dry-run", action="store_true", help="List what would run.")
+    run_eval.add_argument(
+        "--grade",
+        action="store_true",
+        help="Also grade how-to answers with Haiku (data/grader-prompt.md).",
+    )
 
     serve = sub.add_parser(
         "serve", help="Local web page on 127.0.0.1 for running tickets (live, needs key)."
@@ -95,22 +100,37 @@ def _select_tickets(args: argparse.Namespace) -> list[dict[str, Any]]:
 def cmd_eval(args: argparse.Namespace, client_factory: ClientFactory, out: TextIO) -> int:
     from collections import Counter
 
-    from helpdesk_agent.evals import format_summary, run_tickets, write_results
+    from helpdesk_agent.evals import (
+        format_grader_summary,
+        format_summary,
+        run_tickets,
+        write_results,
+    )
 
     tickets = _select_tickets(args)
     if args.dry_run:
         counts = Counter(t["category"] for t in tickets)
-        _print_json({"dry_run": True, "tickets": len(tickets), "by_category": counts}, out)
+        _print_json(
+            {
+                "dry_run": True,
+                "tickets": len(tickets),
+                "by_category": counts,
+                "grade": args.grade,
+            },
+            out,
+        )
         return 0
 
     def progress(ticket: dict[str, Any], result: Any) -> None:
         mark = "pass" if result.passed else "FAIL " + ",".join(result.failed)
         out.write(f"{ticket['id']} {ticket['category']:<18} {mark}\n")
 
-    results = run_tickets(tickets, client_factory(), on_ticket=progress)
+    results = run_tickets(tickets, client_factory(), on_ticket=progress, grade=args.grade)
     path = write_results(results)
     summary = results["summary"]
     out.write("\n" + format_summary(summary, summary["cost_usd"]) + "\n")
+    if "grader" in summary:
+        out.write(format_grader_summary(summary["grader"]) + "\n")
     out.write(f"latency: {summary['latency_ms_total'] / 1000:.1f}s total\n")
     out.write(f"Results: {path}\n")
     return 0

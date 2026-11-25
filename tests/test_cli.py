@@ -154,3 +154,40 @@ def test_serve_builds_a_client_and_passes_the_port(monkeypatch):
     sentinel = object()
     assert main(["serve", "--port", "9001"], client_factory=lambda: sentinel) == 0
     assert seen == {"client": sentinel, "port": 9001}
+
+
+def test_eval_grade_flag_prints_grader_summary(monkeypatch, tmp_path):
+    from pathlib import Path
+
+    from helpdesk_agent.client import GRADER_MODEL
+
+    repo = Path(__file__).parent.parent
+    monkeypatch.chdir(tmp_path)
+    verdict = json.dumps(
+        {"answers_question": True, "grounded": True, "no_contradiction": True, "reason": "ok"}
+    )
+    fake = FakeClient(
+        [
+            message([text("Install Larkspur Connect. Source: vpn-setup")], "end_turn"),
+            message([text(verdict)], "end_turn", model=GRADER_MODEL),
+        ]
+    )
+    out = io.StringIO()
+    code = main(
+        [
+            "eval",
+            "--tickets",
+            str(repo / "evals" / "tickets.jsonl"),
+            "--category",
+            "howto",
+            "--limit",
+            "1",
+            "--grade",
+        ],
+        client_factory=lambda: fake,
+        out=out,
+    )
+    assert code == 0
+    assert "grader (claude-haiku-5-5): 1/1 answers pass" in out.getvalue()
+    (path,) = (tmp_path / "evals" / "results").glob("*.json")
+    assert json.loads(path.read_text())["summary"]["grader"]["passed"] == 1
