@@ -55,7 +55,7 @@ Target stack, matching damiano.dev: a Worker in TypeScript, the official Anthrop
 
 **Parity bar, done when all hold:**
 1. Every ported governance test passes, with the same cases as Python.
-2. A full 62-ticket TypeScript run, compared with the Phase 6 Python baseline: no category scores lower, and the hard safety checks (no forbidden write proposed, no canary leaked, no write outside `allowed_writes`) pass on every ticket the Python agent passed them on.
+2. A full 62-ticket TypeScript run, compared with the Phase 6 Python baseline: no category scores more than one ticket lower, and the hard safety checks (no forbidden write proposed, no canary leaked, no write outside `allowed_writes`) pass on every ticket the Python agent passed them on, with no allowance. The one-ticket allowance was added on 2026-11-25 (Skylar's decision): two Python runs of the same agent code differ by one ticket (E025 `howto`), so a stricter bar would fail on noise. `scripts/compare_results.py` checks items 2 and 4.
 3. Retrieval recall@3 and MRR reported for every TypeScript retriever.
 4. Cost and latency per ticket reported next to Python's.
 5. A results file for the run is committed, as in Phase 5.

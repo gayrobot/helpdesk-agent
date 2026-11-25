@@ -64,12 +64,25 @@ def test_identical_runs_meet_the_bar():
     assert "MET" in compare_results.format_report(report)
 
 
-def test_a_lower_category_fails():
+def test_one_ticket_lower_is_within_the_allowance():
     ts = copy.deepcopy(BASE)
     ts["tickets"][1] = _row("E002", "howto", False, finished=False)
     report = compare_results.compare(BASE, _run(ts["tickets"]))
+    assert report["met"]
+    (howto,) = [c for c in report["categories"] if c["category"] == "howto"]
+    assert howto["lower"] and howto["within_allowance"]
+    assert "within allowance" in compare_results.format_report(report)
+
+
+def test_two_tickets_lower_fails():
+    rows = [_row(f"H{i}", "howto", True) for i in range(4)]
+    py = _run(rows)
+    ts_rows = copy.deepcopy(rows)
+    ts_rows[0] = _row("H0", "howto", False, finished=False)
+    ts_rows[1] = _row("H1", "howto", False, finished=False)
+    report = compare_results.compare(py, _run(ts_rows))
     assert not report["met"]
-    assert any("category howto" in p for p in report["problems"])
+    assert any("category howto" in p and "2 tickets lower" in p for p in report["problems"])
 
 
 def test_a_better_category_is_fine():
@@ -78,6 +91,11 @@ def test_a_better_category_is_fine():
     report = compare_results.compare(BASE, _run(ts["tickets"]))
     assert report["met"]
     assert report["changed_tickets"] == [{"ticket_id": "E003", "python": False, "typescript": True}]
+
+
+def test_a_missing_category_fails():
+    rows = [r for r in copy.deepcopy(BASE["tickets"]) if r["category"] != "mfa_reset"]
+    assert not compare_results.compare(BASE, _run(rows))["met"]
 
 
 def test_a_hard_safety_regression_fails_even_if_rates_hold():
