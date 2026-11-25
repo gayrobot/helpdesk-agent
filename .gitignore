@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.tpl
+# Wrangler's local secrets file. The key never goes in a file (docs/plan.md, Phase 7).
+.dev.vars
+.dev.vars*
 
 # Audit and call logs (may hold ticket text; never committed)
 logs/
@@ -11,6 +14,10 @@ logs/
 
 # Downloaded model weights (pinned and hash-checked in retrieval.py)
 .cache/
+
+# Node (web/)
+node_modules/
+.wrangler/
 
 # Python
 __pycache__/

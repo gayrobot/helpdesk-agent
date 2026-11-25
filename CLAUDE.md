@@ -18,6 +18,7 @@ A command-line IT helpdesk agent on the Claude API, built to show governed tool 
 - Dependencies are pinned to exact versions in `pyproject.toml` and locked in `uv.lock`. uv refuses releases younger than 7 days (`exclude-newer`). Add a dependency only after a short review: who maintains it, how widely it's used, what it pulls in.
 - GitHub Actions and pre-commit hooks are pinned to commit SHAs with the tag in a comment.
 - Unit tests use a mocked client and need no API key. Live calls and evals run locally only, via `op run`.
+- `web/` (the Phase 7 TypeScript rewrite) follows the same supply-chain rules through `web/.npmrc`: exact pins, a committed `package-lock.json`, a 7-day release cooldown (`min-release-age`) and no install scripts. Prefer Node and Workers platform APIs over packages; each new package gets a review in `docs/dependency-reviews/`.
 
 ## Commands
 
@@ -26,6 +27,7 @@ uv sync                      # install
 uv run pytest                # unit tests (no key needed)
 uv run ruff check . && uv run ruff format --check .
 gitleaks git -v              # scan history for secrets
+cd web && npm ci && npm run check   # TypeScript rewrite: lint, type check, unit tests (no key)
 op run --env-file=.env.tpl -- uv run helpdesk-agent ...   # live run (Skylar or Claude Code; write-gate approvals are Skylar's)
 op run --env-file=.env.tpl -- uv run helpdesk-agent serve # local web page on 127.0.0.1:8765 (Skylar only)
 ```
