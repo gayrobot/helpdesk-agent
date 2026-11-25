@@ -28,6 +28,7 @@ import {
 } from "../src/grader.ts";
 import { MemoryEscalations } from "../src/memory.ts";
 import { loadRunbooks } from "../src/node/runbooks.ts";
+import { pyFixed, pyPercent0 } from "../src/pycompat.ts";
 import { BM25Retriever } from "../src/retrieval.ts";
 import { FakeClient, message, text, thinking, toolUse } from "./fakes.ts";
 import fixtures from "./fixtures/evals.json" with { type: "json" };
@@ -191,3 +192,13 @@ for (const mode of ["plain", "graded"] as const) {
     }
   });
 }
+
+test("number formats match Python's, exact ties included", () => {
+  const formats = (fixtures as unknown as { formats: Record<string, number | string>[] }).formats;
+  for (const f of formats) {
+    const v = f.value as number;
+    assert.equal(pyPercent0(v), f.percent0, `${v}:.0%`);
+    assert.equal(pyFixed(v, 1), f.fixed1, `${v}:.1f`);
+    assert.equal(pyFixed(v, 4), f.fixed4, `${v}:.4f`);
+  }
+});

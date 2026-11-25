@@ -46,6 +46,16 @@ AGENT_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "agent.json"
 RETRIEVAL_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "retrieval.json"
 EVALS_FIXTURES_PATH = ROOT / "web" / "test" / "fixtures" / "evals.json"
 
+# The committed Python eval runs used as real model traffic for the fixtures. Named, not
+# globbed: new results files (including TypeScript runs, ts-*.json) must not change them.
+PY_RESULT_FILES = (
+    "2026-11-19T222643Z.json",
+    "2026-11-19T234626Z.json",
+    "2026-11-20T000635Z.json",
+    "2026-11-20T045534Z.json",
+    "2026-11-25T153205Z.json",
+)
+
 # The TypeScript port compares against BM25, the retriever the Python baseline runs used.
 os.environ["HELPDESK_RETRIEVER"] = "bm25"
 
@@ -886,7 +896,7 @@ MARKDOWN_CASES = [
 def _search_queries() -> list[str]:
     """Every query the live Python agent sent to search_runbooks in the committed runs."""
     seen: dict[str, None] = {}
-    for path in sorted((ROOT / "evals" / "results").glob("*.json")):
+    for path in (ROOT / "evals" / "results" / name for name in PY_RESULT_FILES):
         data = json.loads(path.read_text())
         for ticket in data.get("tickets", []):
             for event in ticket.get("transcript", {}).get("events", []):
@@ -986,7 +996,7 @@ def retrieval_fixtures() -> dict[str, Any]:
 def _real_transcripts() -> list[dict[str, Any]]:
     """Every transcript in the committed result files, plus the hand-labelled ones."""
     out = []
-    for path in sorted((ROOT / "evals" / "results").glob("*.json")):
+    for path in (ROOT / "evals" / "results" / name for name in PY_RESULT_FILES):
         for row in json.loads(path.read_text())["tickets"]:
             out.append(
                 {
@@ -1131,7 +1141,38 @@ def evals_fixtures() -> dict[str, Any]:
             results["summary"]["grader_table"] = format_grader_summary(results["summary"]["grader"])
         runs["graded" if grade else "plain"] = results
 
+    format_values = [
+        0,
+        0.005,
+        0.125,
+        0.25,
+        0.35,
+        0.5,
+        0.625,
+        0.6429,
+        0.875,
+        0.9286,
+        0.9737,
+        1,
+        1.5,
+        2.5,
+        0.03125,
+        0.633712,
+        0.0035,
+        309.45,
+        296.5,
+        0.25e-4,
+        12.345,
+        -0.25,
+        1.005,
+        0.6666666,
+    ]
+    formats = [
+        {"value": v, "percent0": f"{v:.0%}", "fixed1": f"{v:.1f}", "fixed4": f"{v:.4f}"}
+        for v in format_values
+    ]
     return {
+        "formats": formats,
         "scores": scored,
         "summaries": summaries,
         "grader": {

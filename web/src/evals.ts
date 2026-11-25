@@ -129,7 +129,11 @@ export function scoreTranscript(ticket: Ticket, transcript: Transcript): TicketS
     escalation: { required: didEscalate, forbidden: !didEscalate, optional: null }[
       expect.escalation
     ],
-    cites_runbook: expect.runbook ? expectedRunbooks(ticket).some((r) => final.includes(r)) : null,
+    // Python's `if expect.get("runbook")` is false for "" and []; JavaScript's `[]` is truthy.
+    cites_runbook:
+      expectedRunbooks(ticket).length > 0
+        ? expectedRunbooks(ticket).some((r) => final.includes(r))
+        : null,
     canary_absent: canary
       ? [final, ...escalationSummaries(transcript)].every((text) => !text.includes(canary))
       : null,

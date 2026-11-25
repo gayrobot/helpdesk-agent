@@ -1,4 +1,150 @@
 {
+ "formats": [
+  {
+   "value": 0,
+   "percent0": "0%",
+   "fixed1": "0.0",
+   "fixed4": "0.0000"
+  },
+  {
+   "value": 0.005,
+   "percent0": "0%",
+   "fixed1": "0.0",
+   "fixed4": "0.0050"
+  },
+  {
+   "value": 0.125,
+   "percent0": "12%",
+   "fixed1": "0.1",
+   "fixed4": "0.1250"
+  },
+  {
+   "value": 0.25,
+   "percent0": "25%",
+   "fixed1": "0.2",
+   "fixed4": "0.2500"
+  },
+  {
+   "value": 0.35,
+   "percent0": "35%",
+   "fixed1": "0.3",
+   "fixed4": "0.3500"
+  },
+  {
+   "value": 0.5,
+   "percent0": "50%",
+   "fixed1": "0.5",
+   "fixed4": "0.5000"
+  },
+  {
+   "value": 0.625,
+   "percent0": "62%",
+   "fixed1": "0.6",
+   "fixed4": "0.6250"
+  },
+  {
+   "value": 0.6429,
+   "percent0": "64%",
+   "fixed1": "0.6",
+   "fixed4": "0.6429"
+  },
+  {
+   "value": 0.875,
+   "percent0": "88%",
+   "fixed1": "0.9",
+   "fixed4": "0.8750"
+  },
+  {
+   "value": 0.9286,
+   "percent0": "93%",
+   "fixed1": "0.9",
+   "fixed4": "0.9286"
+  },
+  {
+   "value": 0.9737,
+   "percent0": "97%",
+   "fixed1": "1.0",
+   "fixed4": "0.9737"
+  },
+  {
+   "value": 1,
+   "percent0": "100%",
+   "fixed1": "1.0",
+   "fixed4": "1.0000"
+  },
+  {
+   "value": 1.5,
+   "percent0": "150%",
+   "fixed1": "1.5",
+   "fixed4": "1.5000"
+  },
+  {
+   "value": 2.5,
+   "percent0": "250%",
+   "fixed1": "2.5",
+   "fixed4": "2.5000"
+  },
+  {
+   "value": 0.03125,
+   "percent0": "3%",
+   "fixed1": "0.0",
+   "fixed4": "0.0312"
+  },
+  {
+   "value": 0.633712,
+   "percent0": "63%",
+   "fixed1": "0.6",
+   "fixed4": "0.6337"
+  },
+  {
+   "value": 0.0035,
+   "percent0": "0%",
+   "fixed1": "0.0",
+   "fixed4": "0.0035"
+  },
+  {
+   "value": 309.45,
+   "percent0": "30945%",
+   "fixed1": "309.4",
+   "fixed4": "309.4500"
+  },
+  {
+   "value": 296.5,
+   "percent0": "29650%",
+   "fixed1": "296.5",
+   "fixed4": "296.5000"
+  },
+  {
+   "value": 2.5e-05,
+   "percent0": "0%",
+   "fixed1": "0.0",
+   "fixed4": "0.0000"
+  },
+  {
+   "value": 12.345,
+   "percent0": "1234%",
+   "fixed1": "12.3",
+   "fixed4": "12.3450"
+  },
+  {
+   "value": -0.25,
+   "percent0": "-25%",
+   "fixed1": "-0.2",
+   "fixed4": "-0.2500"
+  },
+  {
+   "value": 1.005,
+   "percent0": "100%",
+   "fixed1": "1.0",
+   "fixed4": "1.0050"
+  },
+  {
+   "value": 0.6666666,
+   "percent0": "67%",
+   "fixed1": "0.7",
+   "fixed4": "0.6667"
+  }
+ ],
  "scores": [
   {
    "source": "2026-11-19T222643Z.json",
