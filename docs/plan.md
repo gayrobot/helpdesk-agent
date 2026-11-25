@@ -15,6 +15,8 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 | 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
 | 6 | Project write-up for damiano.dev: problem, architecture, governance rules, real eval numbers, cost per ticket, retrieval comparison, what fails and why | Page published |
 
+Phases 7–12 (agent identity: verified requester, delegated tokens, permission-filtered retrieval, approver identity) are planned in [identity-plan.md](identity-plan.md). The "Out of scope" section below is amended by the Phase 7 PR.
+
 ## Governance rules (enforced in code)
 
 1. **Allowlist.** Only the tools below exist. Unknown tool names are rejected and audited.
