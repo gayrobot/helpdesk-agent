@@ -1,7 +1,14 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["src/**", "test/**", "*.json", "!package-lock.json"]
+    "includes": [
+      "src/**",
+      "test/**",
+      "*.json",
+      "!package-lock.json",
+      "!src/generated",
+      "!test/fixtures"
+    ]
   },
   "formatter": {
     "enabled": true,
