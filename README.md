@@ -47,6 +47,16 @@ The full eval (62 synthetic tickets, every write auto-denied) is live:
 op run --env-file=.env.tpl -- uv run helpdesk-agent eval
 ```
 
+### Local web page
+
+`serve` runs tickets from a browser page on `http://127.0.0.1:8765/`. Pick a requester (a synthetic user), type a ticket, and watch the reply with its `Source:` runbook line and every tool call with its policy decision. A write shows the same fields as the terminal prompt (tool, arguments, effect, requester, target, and a warning when the requester isn't the target) with **Approve** and **Deny** buttons:
+
+```bash
+op run --env-file=.env.tpl -- uv run helpdesk-agent serve
+```
+
+It binds to `127.0.0.1` only and runs one ticket at a time. Every rule still runs in the same governance gate; the page only replaces typing `y`. Each proposal has a one-time id, and a write runs only after Approve is clicked on that proposal. A deny, a 5-minute timeout or stopping the server all deny. API calls need a per-process token and this page's own origin, so other sites open in the same browser can't drive it. The key stays in the server process.
+
 `--dry-run` on the live commands prints what would be sent and needs no key. Each model call is logged to `logs/calls.jsonl` (model, request ID, tokens, cost, latency, stop reason) and each tool call to `logs/audit.jsonl`.
 
 ## License

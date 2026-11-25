@@ -139,3 +139,18 @@ def test_eval_live_path_writes_results(monkeypatch, tmp_path):
     assert code == 0
     assert list((tmp_path / "evals" / "results").glob("*.json"))
     assert "E001" in out.getvalue()
+
+
+def test_serve_builds_a_client_and_passes_the_port(monkeypatch):
+    import helpdesk_agent.webui as webui
+
+    seen = {}
+
+    def fake_serve(client, port, out):
+        seen.update(client=client, port=port)
+        return 0
+
+    monkeypatch.setattr(webui, "serve", fake_serve)
+    sentinel = object()
+    assert main(["serve", "--port", "9001"], client_factory=lambda: sentinel) == 0
+    assert seen == {"client": sentinel, "port": 9001}
