@@ -103,6 +103,13 @@ Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a
 | 2. Guided demo | Anyone | Pick a persona (an engineer, a manager, an IT approver) and watch the I1–I4 rules hold: reads filtered by role, a stranger's write refused before approval, and approval by a *different* `it-support` persona, so separation of duties is visible. Writes change only that session's Durable Object. | The dev issuer, labelled "simulated sign-in" on the page |
 | 3. Real sign-in | Skylar and invited reviewers, behind Cloudflare Access | The same as tier 2, signed in through Okta, with per-tool scoped tokens | Okta (I5) |
 
+**The signed-in screen is split** (tiers 2 and 3, decided 2026-11-25):
+- **Left, the requester:** the ticket box, the reply with its `Source:` line, and the requester's own view of what happened.
+- **Right, the admin:** the IT approver's view: the approval queue with the full proposal (tool, arguments, effect, requester, target, the mismatch flag), Approve and Deny, the tool-call panel with each result and its fingerprint, and the session's audit trail.
+- **Each side has its own identity.** The left is signed in as the requester persona, the right as an `it-support` persona, each with its own token, and the API checks which side a request comes from. The right side can't file tickets and the left side can't approve, so separation of duties shows on screen instead of being described.
+- **On a phone** the two sides stack, with a toggle between them.
+- **Honesty:** one visitor drives both sides, so the split proves the rule (the approver's identity is not the requester's), not that two different people were involved.
+
 **Why Okta personas aren't open to the public:** that would mean publishing passwords to a real identity tenant. Anyone could then change a persona's password or MFA or lock it out, and it would run into the free plan's user limits. Tier 2 shows the same enforcement code to everyone; tier 3 shows the authentication is real, to people Skylar chooses.
 
 **Cost controls.** On a site with no real data, spend is the real risk:
