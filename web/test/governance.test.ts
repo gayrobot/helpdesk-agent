@@ -17,16 +17,16 @@ import { test } from "node:test";
 import { MemoryAudit } from "../src/audit.ts";
 import { Directory } from "../src/directory.ts";
 import { DENIED_BY_HUMAN, Decision, denyAll, Gate, resultFingerprint } from "../src/governance.ts";
-import { Principal } from "../src/identity.ts";
+import { Principal, SignIn } from "../src/identity.ts";
 import { TOOLS } from "../src/tools.ts";
 import {
   FIXED_NOW,
   JAMIE,
   MemoryEscalations,
   makeGate,
-  principalFor,
   RecordingApprover,
   StubRetriever,
+  TEST_ISSUER,
 } from "./helpers.ts";
 
 // Python's requester-differs tests used Priya, who isn't Jamie's manager. Under identity
@@ -198,7 +198,7 @@ test("test_audit_failure_blocks_the_write", async () => {
     escalations: new MemoryEscalations(),
     retriever: new StubRetriever(),
     ticketId: "T-TEST",
-    principal: await principalFor(JAMIE),
+    signIn: await TEST_ISSUER.signIn(JAMIE),
   });
   await assert.rejects(gate.execute("reset_mfa", { email: JAMIE }), /disk full/);
   assert.equal(mfaEnrolled(directory), true);
@@ -474,7 +474,7 @@ for (const requester of [
   });
 }
 
-function gateFor(principal: unknown) {
+function gateFor(signIn: unknown) {
   return new Gate({
     directory: Directory.load(),
     approver: denyAll,
@@ -482,20 +482,22 @@ function gateFor(principal: unknown) {
     escalations: new MemoryEscalations(),
     retriever: new StubRetriever(),
     ticketId: "T-TEST",
-    principal: principal as Principal,
+    signIn: signIn as SignIn,
   });
 }
 
-test("ts_gate_refuses_anything_but_a_verified_principal", async () => {
-  const real = await principalFor(JAMIE);
+test("ts_gate_refuses_anything_but_a_sign_in_from_an_issuer", async () => {
+  const real = await TEST_ISSUER.signIn(JAMIE);
   assert.doesNotThrow(() => gateFor(real));
   for (const forged of [
     JAMIE,
-    { sub: JAMIE, issuer: real.issuer, jti: real.jti },
+    real.principal, // a verified principal alone is no longer enough (I2)
+    { principal: real.principal },
     { ...real },
     JSON.parse(JSON.stringify(real)),
+    Object.create(SignIn.prototype),
+    Object.assign(Object.create(SignIn.prototype), { principal: real.principal }),
     Object.create(Principal.prototype),
-    Object.assign(Object.create(Principal.prototype), { sub: JAMIE }),
   ]) {
     assert.throws(() => gateFor(forged), TypeError, JSON.stringify(forged));
   }
@@ -594,7 +596,7 @@ test("ts_audit_sink_failure_on_a_read_propagates", async () => {
     escalations: new MemoryEscalations(),
     retriever: new StubRetriever(),
     ticketId: "T-TEST",
-    principal: await principalFor(JAMIE),
+    signIn: await TEST_ISSUER.signIn(JAMIE),
   });
   await assert.rejects(gate.execute("lookup_user", { email: JAMIE }), /audit down/);
 });

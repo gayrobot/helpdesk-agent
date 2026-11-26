@@ -77,7 +77,7 @@ export interface AskDeps {
 
 /** Answer one question. The caller has already checked the switch, Turnstile and budget. */
 export async function askRunbooks(question: string, deps: AskDeps): Promise<AskResult> {
-  const principal = await deps.issuer.principalFor(GUEST);
+  const signIn = await deps.issuer.signIn(GUEST);
   const gate = new Gate({
     directory: Directory.load(),
     approver: denyAll,
@@ -85,7 +85,7 @@ export async function askRunbooks(question: string, deps: AskDeps): Promise<AskR
     escalations: new MemoryEscalations(),
     retriever: deps.retriever,
     ticketId: `ASK-${crypto.randomUUID().slice(0, 8)}`,
-    principal,
+    signIn,
     allowedTools: ASK_TOOLS,
   });
   const calls = new MemoryCallLog();

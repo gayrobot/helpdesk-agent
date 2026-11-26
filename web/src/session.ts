@@ -222,7 +222,7 @@ export class Session {
       // Verified for this run only, and never stored: a restarted session rebuilds no
       // identity from a stored email.
       this.issuer ??= this.opts.issuer ?? new DevIssuer();
-      const principal = await this.issuer.principalFor(run.requester);
+      const signIn = await this.issuer.signIn(run.requester);
       const staged: Record<string, unknown>[] = [];
       const gate = new PanelGate({
         directory: this.directory,
@@ -231,7 +231,7 @@ export class Session {
         escalations: { save: (r) => this.opts.store.saveEscalation(r) },
         retriever: this.opts.retriever,
         ticketId: run.ticket_id,
-        principal,
+        signIn,
         clock: this.opts.clock,
       });
       gate.run = run;

@@ -13,6 +13,13 @@
  *   configuration and never taken from the token. Strict about the encoding and every
  *   claim.
  *
+ * Identity phase I2 adds delegated tokens: the agent is its own identity (`AgentIdentity`,
+ * a key in memory) and, for every tool call, exchanges the requester's subject token plus
+ * its own signed client assertion for a 60-second token naming one audience and one scope
+ * (the RFC 8693 shape). `GrantVerifier` is the resource side: it accepts only such tokens,
+ * each `jti` once. The harness holds the tokens in a `SignIn`; the gate asks it for a grant
+ * per call and the tool's handler refuses to run without one (`delegation.ts`).
+ *
  * Tokens never go to the model, the logs, the page or storage. A principal lives for one
  * run and is never stored; a restarted session rebuilds nothing from a stored email.
  */
@@ -207,27 +214,292 @@ export class TokenVerifier {
   }
 }
 
+// ---------------------------------------------------------------- delegated tokens (I2)
+
+/** The agent's client id: `act.sub` in every delegated token. */
+export const AGENT_CLIENT_ID = "helpdesk-agent";
+export const GRANT_SECONDS = 60;
+const ASSERTION_SECONDS = 60;
+const GRANT_TYPE = "at+jwt"; // RFC 9068, so a subject token can't pass as a grant
+const ASSERTION_TYPE = "client-assertion+jwt";
+
+/** Resource servers and the scopes each one accepts (docs/identity-plan.md, Tokens). */
+export const RESOURCE_SCOPES: Readonly<Record<string, readonly string[]>> = {
+  "larkspur-directory": [
+    "directory:read",
+    "devices:read",
+    "directory:mfa.reset",
+    "directory:group.add",
+  ],
+  "larkspur-runbooks": ["runbooks:read"],
+  "larkspur-tickets": ["tickets:escalate"],
+};
+
+const randomJti = () => b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
+
+function parseClaims(payload: Uint8Array): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(fromUtf8(payload));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+    return parsed;
+  } catch {
+    throw new TokenError("claims are not a JSON object");
+  }
+}
+
+function requireClaims(claims: Record<string, unknown>, names: string[]) {
+  for (const name of names) {
+    if (!(name in claims)) throw new TokenError(`missing claim ${name}`);
+  }
+}
+
+/** exp, iat and nbf checks shared by assertions and grants. */
+function checkTimes(claims: Record<string, unknown>, now: number, maxLifetime: number) {
+  if (!isInt(claims.exp) || !isInt(claims.iat))
+    throw new TokenError("exp and iat must be integers");
+  if (claims.exp <= now - MAX_CLOCK_SKEW_SECONDS) throw new TokenError("token expired");
+  if (claims.iat > now + MAX_CLOCK_SKEW_SECONDS) throw new TokenError("token issued in the future");
+  if (claims.exp - claims.iat > maxLifetime) throw new TokenError("token lives too long");
+  if ("nbf" in claims) {
+    if (!isInt(claims.nbf)) throw new TokenError("nbf must be an integer");
+    if (claims.nbf > now + MAX_CLOCK_SKEW_SECONDS) throw new TokenError("token not yet valid");
+  }
+}
+
+/** Remembers each `jti` until its token has expired; a second use is refused. */
+export class ReplayCache {
+  private readonly seen = new Map<string, number>();
+
+  use(jti: string, exp: number, now: number) {
+    for (const [id, until] of this.seen) {
+      if (until + MAX_CLOCK_SKEW_SECONDS < now) this.seen.delete(id);
+    }
+    if (this.seen.has(jti)) throw new TokenError("token already used");
+    this.seen.set(jti, exp);
+  }
+
+  get size() {
+    return this.seen.size;
+  }
+}
+
+/**
+ * The agent as its own identity: a client with an ES256 key generated in memory, which
+ * signs short client assertions for the token exchange. It never holds a token that can
+ * act on its own.
+ */
+export class AgentIdentity {
+  readonly clientId = AGENT_CLIENT_ID;
+  private keys: Promise<KeyPair> | null = null;
+  private readonly now: () => number;
+
+  constructor(now: () => number = () => Math.floor(Date.now() / 1000)) {
+    this.now = now;
+  }
+
+  private keyPair(): Promise<KeyPair> {
+    this.keys ??= crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, [
+      "sign",
+      "verify",
+    ]) as Promise<KeyPair>;
+    return this.keys;
+  }
+
+  /** The public half, which the issuer registers for this client. */
+  async publicKey(): Promise<Key> {
+    return (await this.keyPair()).publicKey;
+  }
+
+  /** A single-use client assertion for `audience` (the issuer's token endpoint). */
+  async assertion(audience: string): Promise<string> {
+    const iat = this.now();
+    return signJws(
+      { typ: ASSERTION_TYPE },
+      {
+        iss: this.clientId,
+        sub: this.clientId,
+        aud: audience,
+        iat,
+        exp: iat + ASSERTION_SECONDS,
+        jti: randomJti(),
+      },
+      (await this.keyPair()).privateKey,
+      "ES256",
+    );
+  }
+}
+
+/** What a verified delegated token says. No token text is kept. */
+export interface Grant {
+  readonly sub: string;
+  readonly act: string;
+  readonly aud: string;
+  readonly scope: string;
+  readonly ticketId: string;
+  readonly jti: string;
+}
+
+export interface GrantVerifierConfig {
+  issuer: string;
+  audience: string;
+  key: Key | Promise<Key>;
+  replay: ReplayCache;
+  now?: () => number;
+}
+
+/**
+ * A resource server's check of a delegated token: one issuer, one audience, ES256, typed
+ * `at+jwt`, acting for the agent, exactly the scope this call needs, for this ticket, at
+ * most 60 seconds long, and each `jti` once.
+ */
+export class GrantVerifier {
+  readonly audience: string;
+  private readonly config: Required<GrantVerifierConfig>;
+
+  constructor(config: GrantVerifierConfig) {
+    this.audience = config.audience;
+    this.config = { now: () => Math.floor(Date.now() / 1000), ...config };
+  }
+
+  async verify(token: unknown, scope: string, ticketId: string): Promise<Grant> {
+    const { issuer, audience, key, replay, now } = this.config;
+    if (typeof token !== "string" || !token) throw new TokenError("no grant");
+    const { header, payload } = await verifyJwsSignature(token, await key, "ES256");
+    if (header.typ !== GRANT_TYPE) throw new TokenError("not a delegated token");
+    const claims = parseClaims(payload);
+    requireClaims(claims, ["iss", "sub", "aud", "exp", "iat", "jti", "act", "scope", "ticket_id"]);
+    if (claims.iss !== issuer) throw new TokenError("wrong issuer");
+    if (claims.aud !== audience) throw new TokenError("wrong audience");
+    if (typeof claims.sub !== "string" || !EMAIL_PATTERN.test(claims.sub)) {
+      throw new TokenError("subject is not a directory email");
+    }
+    const act = claims.act as Record<string, unknown> | null;
+    if (!act || typeof act !== "object" || Array.isArray(act) || act.sub !== AGENT_CLIENT_ID) {
+      throw new TokenError("not acting for the agent");
+    }
+    if (claims.scope !== scope) throw new TokenError("wrong scope");
+    if (claims.ticket_id !== ticketId) throw new TokenError("token is for another ticket");
+    if (typeof claims.jti !== "string" || !claims.jti) throw new TokenError("bad jti");
+    const t = now();
+    checkTimes(claims, t, GRANT_SECONDS);
+    replay.use(claims.jti, claims.exp as number, t);
+    return {
+      sub: claims.sub,
+      act: AGENT_CLIENT_ID,
+      aud: audience,
+      scope,
+      ticketId,
+      jti: claims.jti,
+    };
+  }
+}
+
+/** The resource servers' verifiers, sharing one replay cache. */
+export class Resources {
+  private readonly verifiers: ReadonlyMap<string, GrantVerifier>;
+
+  constructor(verifiers: GrantVerifier[]) {
+    this.verifiers = new Map(verifiers.map((v) => [v.audience, v]));
+  }
+
+  get(audience: string): GrantVerifier {
+    const v = this.verifiers.get(audience);
+    if (!v) throw new TokenError("unknown resource");
+    return v;
+  }
+}
+
+export interface ExchangeRequest {
+  subjectToken: string;
+  actorToken: string;
+  audience: string;
+  scope: string;
+  ticketId: string;
+}
+
+const SIGN_IN = Symbol("sign-in");
+
+/**
+ * A signed-in requester as the harness holds it: the verified principal, and privately
+ * the subject token, which only ever goes to the issuer's token exchange. The model, the
+ * logs and the page see none of it.
+ */
+export class SignIn {
+  readonly #token: string;
+  readonly #issuer: DevIssuer;
+  readonly #agent: AgentIdentity;
+  readonly principal: Principal;
+
+  constructor(
+    key: symbol,
+    token: string,
+    principal: Principal,
+    issuer: DevIssuer,
+    agent: AgentIdentity,
+  ) {
+    if (key !== SIGN_IN) throw new TypeError("a SignIn comes only from an issuer");
+    this.#token = token;
+    this.principal = principal;
+    this.#issuer = issuer;
+    this.#agent = agent;
+    Object.freeze(this);
+  }
+
+  static is(value: unknown): value is SignIn {
+    return typeof value === "object" && value !== null && #token in value;
+  }
+
+  /** The resource servers that accept this issuer's grants. */
+  get resources(): Resources {
+    return this.#issuer.resources();
+  }
+
+  /** A fresh delegated token for one call: one audience, one scope, this ticket. */
+  async grant(audience: string, scope: string, ticketId: string): Promise<string> {
+    return this.#issuer.exchange({
+      subjectToken: this.#token,
+      actorToken: await this.#agent.assertion(DEV_ISSUER),
+      audience,
+      scope,
+      ticketId,
+    });
+  }
+
+  toJSON() {
+    return SignIn.is(this) ? this.principal.toJSON() : {};
+  }
+}
+
 // ---------------------------------------------------------------- dev issuer
 
 export interface DevIssuerOptions {
   /** A real issuer's URL, if one is configured. The dev issuer refuses to run alongside one. */
   realIssuer?: string | undefined;
   now?: () => number;
+  /** The one client allowed to exchange tokens. A new in-memory agent by default. */
+  agent?: AgentIdentity;
 }
 
+const TICKET_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
 /**
- * Mints subject tokens for synthetic directory users. Its signing key is generated in
- * memory on first use and never leaves this object.
+ * Mints subject tokens for synthetic directory users and runs the token exchange. Its
+ * signing key is generated in memory on first use and never leaves this object.
  */
 export class DevIssuer {
   private readonly now: () => number;
+  private readonly agent: AgentIdentity;
   private keys: Promise<KeyPair> | null = null;
+  private resourceSet: Resources | null = null;
+  private readonly assertionReplay = new ReplayCache();
+  private readonly grantReplay = new ReplayCache();
 
   constructor(options: DevIssuerOptions = {}) {
     if (options.realIssuer) {
       throw new Error("the dev issuer refuses to start while a real issuer is configured");
     }
     this.now = options.now ?? (() => Math.floor(Date.now() / 1000));
+    this.agent = options.agent ?? new AgentIdentity(this.now);
   }
 
   private keyPair(): Promise<KeyPair> {
@@ -243,19 +515,18 @@ export class DevIssuer {
   async mint(email: string): Promise<string> {
     if (!EMAIL_PATTERN.test(email)) throw new TokenError("not a directory email");
     const iat = this.now();
-    const jti = b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
     const claims = {
       iss: DEV_ISSUER,
       sub: email,
       aud: AGENT_AUDIENCE,
       iat,
       exp: iat + SUBJECT_TOKEN_SECONDS,
-      jti,
+      jti: randomJti(),
     };
     return signJws({ typ: "JWT" }, claims, (await this.keyPair()).privateKey, "ES256");
   }
 
-  /** The verifier for this issuer's tokens. */
+  /** The verifier for this issuer's subject tokens. */
   async verifier(now?: () => number): Promise<TokenVerifier> {
     return new TokenVerifier({
       issuer: DEV_ISSUER,
@@ -269,5 +540,81 @@ export class DevIssuer {
   /** Mint and verify in one step: the usual way a harness gets a principal. */
   async principalFor(email: string): Promise<Principal> {
     return (await this.verifier()).verify(await this.mint(email));
+  }
+
+  /** Sign `email` in: the principal plus the subject token, held for the exchange. */
+  async signIn(email: string): Promise<SignIn> {
+    const token = await this.mint(email);
+    const principal = await (await this.verifier()).verify(token);
+    return new SignIn(SIGN_IN, token, principal, this, this.agent);
+  }
+
+  /**
+   * Token exchange (RFC 8693 shape): a valid subject token plus the registered agent's
+   * client assertion buys one delegated token for one audience and one scope, for one
+   * ticket, for 60 seconds. Anything else throws TokenError.
+   */
+  async exchange(request: ExchangeRequest): Promise<string> {
+    const { subjectToken, actorToken, audience, scope, ticketId } = request;
+    const t = this.now();
+    // The agent authenticates itself with its own key.
+    const { header, payload } = await verifyJwsSignature(
+      actorToken,
+      await this.agent.publicKey(),
+      "ES256",
+    );
+    if (header.typ !== ASSERTION_TYPE) throw new TokenError("not a client assertion");
+    const assertion = parseClaims(payload);
+    requireClaims(assertion, ["iss", "sub", "aud", "exp", "iat", "jti"]);
+    if (assertion.iss !== AGENT_CLIENT_ID || assertion.sub !== AGENT_CLIENT_ID) {
+      throw new TokenError("unknown client");
+    }
+    if (assertion.aud !== DEV_ISSUER) throw new TokenError("assertion for another issuer");
+    if (typeof assertion.jti !== "string" || !assertion.jti) throw new TokenError("bad jti");
+    checkTimes(assertion, t, ASSERTION_SECONDS);
+    // The requester's subject token: same checks as at sign-in.
+    const principal = await (await this.verifier()).verify(subjectToken);
+    const scopes = Object.hasOwn(RESOURCE_SCOPES, audience) ? RESOURCE_SCOPES[audience] : undefined;
+    if (!scopes) throw new TokenError("unknown resource");
+    if (typeof scope !== "string" || !scopes.includes(scope)) {
+      throw new TokenError("scope not offered by that resource");
+    }
+    if (typeof ticketId !== "string" || !TICKET_ID.test(ticketId)) {
+      throw new TokenError("bad ticket id");
+    }
+    this.assertionReplay.use(assertion.jti, assertion.exp as number, t);
+    return signJws(
+      { typ: GRANT_TYPE },
+      {
+        iss: DEV_ISSUER,
+        sub: principal.sub,
+        act: { sub: AGENT_CLIENT_ID },
+        aud: audience,
+        scope,
+        ticket_id: ticketId,
+        iat: t,
+        exp: t + GRANT_SECONDS,
+        jti: randomJti(),
+      },
+      (await this.keyPair()).privateKey,
+      "ES256",
+    );
+  }
+
+  /** The resource servers' verifiers for this issuer's grants (one shared replay cache). */
+  resources(): Resources {
+    this.resourceSet ??= new Resources(
+      Object.keys(RESOURCE_SCOPES).map(
+        (audience) =>
+          new GrantVerifier({
+            issuer: DEV_ISSUER,
+            audience,
+            key: this.keyPair().then((k) => k.publicKey),
+            replay: this.grantReplay,
+            now: this.now,
+          }),
+      ),
+    );
+    return this.resourceSet;
   }
 }
