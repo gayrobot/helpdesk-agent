@@ -2,6 +2,7 @@
 import { MemoryAudit } from "../src/audit.ts";
 import { Directory } from "../src/directory.ts";
 import { type Approver, denyAll, Gate, type Proposal } from "../src/governance.ts";
+import { DevIssuer } from "../src/identity.ts";
 import { MemoryEscalations } from "../src/memory.ts";
 import type { Retriever, RunbookHit } from "../src/tools.ts";
 
@@ -35,7 +36,11 @@ export class RecordingApprover {
   };
 }
 
-export function makeGate(
+/** One dev issuer for the test process: tests get verified principals, never strings. */
+export const TEST_ISSUER = new DevIssuer();
+export const principalFor = (email: string) => TEST_ISSUER.principalFor(email);
+
+export async function makeGate(
   options: {
     approver?: Approver;
     requester?: string;
@@ -49,6 +54,7 @@ export function makeGate(
   const directory = options.directory ?? Directory.load();
   const audit = options.audit ?? new MemoryAudit(() => FIXED_NOW);
   const escalations = options.escalations ?? new MemoryEscalations();
+  const principal = await principalFor(options.requester ?? JAMIE);
   const gate = new Gate({
     directory,
     approver: options.approver ?? denyAll,
@@ -56,7 +62,7 @@ export function makeGate(
     escalations,
     retriever: options.retriever ?? new StubRetriever(),
     ticketId: options.ticketId ?? "T-TEST",
-    requester: options.requester ?? JAMIE,
+    principal,
     clock: () => FIXED_NOW,
   });
   return { gate, directory, audit, escalations };

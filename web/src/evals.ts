@@ -21,6 +21,7 @@ import { type CallLog, type MessagesClient, ModelCaller } from "./client.ts";
 import { Directory } from "./directory.ts";
 import { Decision, denyAll, Gate } from "./governance.ts";
 import { expectedRunbooks, GRADED_STATUSES, type Grader, summarizeGrades } from "./grader.ts";
+import { DevIssuer } from "./identity.ts";
 import { compareCodePoints, pyEqual, pyFixed, pyPercent0 } from "./pycompat.ts";
 import type { EscalationStore, Retriever } from "./tools.ts";
 import { TOOLS, ToolKind } from "./tools.ts";
@@ -206,6 +207,8 @@ export interface RunOptions {
   escalations: EscalationStore;
   retriever: Retriever;
   grader?: Grader | null;
+  /** Mints each ticket's requester token (identity phase I1). A new one per run if absent. */
+  issuer?: DevIssuer;
   onTicket?: (ticket: Ticket, score: TicketScore) => void;
 }
 
@@ -226,7 +229,11 @@ export async function runTickets(
   const log = options.callLog;
   const grader = options.grader ?? null;
   const rows: Record<string, unknown>[] = [];
+  const issuer = options.issuer ?? new DevIssuer();
   for (const ticket of tickets) {
+    // The requester is verified, not typed: a token from the dev issuer, checked by its
+    // verifier. Minted per ticket and never stored.
+    const principal = await issuer.principalFor(ticket.requester);
     const gate = new Gate({
       directory: Directory.load(), // fresh copy per ticket
       approver: denyAll,
@@ -234,7 +241,7 @@ export async function runTickets(
       escalations: options.escalations,
       retriever: options.retriever,
       ticketId: ticket.id,
-      requester: ticket.requester,
+      principal,
     });
     const start = log.entries.length;
     const result = await new Agent(new ModelCaller(client, log), gate).run(ticket.body);

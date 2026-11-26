@@ -22,7 +22,9 @@
  * audit sink are passed in instead of using files.
  */
 import type { AuditSink } from "./audit.ts";
+import { card, mayRequest, readView } from "./authz.ts";
 import { type Directory, isMixedScript, normalize } from "./directory.ts";
+import { Principal } from "./identity.ts";
 import { compareCodePoints, pyJsonDumps, pyLen, pyRepr, pyStrip } from "./pycompat.ts";
 import {
   type Args,
@@ -35,6 +37,9 @@ import {
   ToolKind,
   type ToolSpec,
 } from "./tools.ts";
+
+/** Reads that return a person's record: filtered by `readView`. */
+const FILTERED_READS: ReadonlySet<string> = new Set(["lookup_user", "list_devices"]);
 
 export const DENIED_BY_HUMAN =
   "Denied by human operator. Do not retry this action. Tell the requester it was not " +
@@ -155,8 +160,11 @@ export interface GateOptions {
   escalations: EscalationStore;
   retriever: Retriever;
   ticketId: string;
-  /** Who filed the ticket, recorded by the harness (rule 9). The model never supplies it. */
-  requester: string;
+  /**
+   * Who filed the ticket: a verified identity (identity phase I1), never a string. The
+   * model never supplies it, and `Gate` refuses anything that isn't a real `Principal`.
+   */
+  principal: Principal;
   clock?: () => Date;
 }
 
@@ -169,14 +177,19 @@ interface FinishOptions {
 
 export class Gate {
   readonly ctx: ToolContext;
+  readonly principal: Principal;
   private readonly approver: Approver;
   private readonly audit: AuditSink;
 
   constructor(options: GateOptions) {
-    const { requester } = options;
-    if (typeof requester !== "string" || !EMAIL_PATTERN.test(requester)) {
+    if (!Principal.is(options.principal)) {
+      throw new TypeError("Gate needs a verified Principal, not a string or a copy");
+    }
+    const requester = options.principal.sub;
+    if (!EMAIL_PATTERN.test(requester)) {
       throw new TypeError("requester must be a lowercase @example.test address");
     }
+    this.principal = options.principal;
     this.approver = options.approver;
     this.audit = options.audit;
     this.ctx = {
@@ -206,6 +219,26 @@ export class Gate {
       return this.finish(name, spec, args, Decision.INVALID_INPUT, problem, { error: true });
     }
     const valid = args as Args;
+
+    // Identity phase I1: may this requester ask for this write at all? Checked before the
+    // policy checks and before any operator is asked. An unknown target falls through to
+    // the tool's own "no such user" error.
+    if (spec.kind === ToolKind.WRITE) {
+      const target = this.ctx.directory.findUser(valid.email as string);
+      const refusal = target && mayRequest(this.ctx.directory, this.ctx.requester, name, target);
+      if (refusal) {
+        return this.finish(
+          name,
+          spec,
+          valid,
+          Decision.DENIED_BY_POLICY,
+          `Refused by policy: ${refusal}`,
+          {
+            error: true,
+          },
+        );
+      }
+    }
 
     try {
       spec.check?.(this.ctx, valid);
@@ -281,6 +314,18 @@ export class Gate {
         });
       }
       return this.internalError(name, spec, valid, exc, approval);
+    }
+
+    // Reads of another person's record are filtered to the directory card unless the
+    // requester is that person, their manager or IT support. The tool ran on the full
+    // record; only what goes back to the model (and is fingerprinted) is reduced.
+    if (FILTERED_READS.has(name)) {
+      const target = this.ctx.directory.findUser(valid.email as string);
+      if (target && readView(this.ctx.directory, this.ctx.requester, target) === "card") {
+        result = card(target);
+        summary = `${summary} (restricted view)`;
+        reason = `${reason}; restricted view`;
+      }
     }
 
     return this.finish(name, spec, valid, decision, pyJsonDumps(result), {

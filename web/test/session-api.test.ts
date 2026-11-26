@@ -299,13 +299,16 @@ test("test_policy_denied_write_never_reaches_the_page", async () => {
 
 test("test_mismatch_flag_when_requester_is_not_target", async () => {
   const s = await makeSession([
-    message([toolUse("reset_mfa", { email: "priya.nair@example.test" })], "tool_use"),
+    message([toolUse("reset_mfa", { email: JAMIE })], "tool_use"),
     DONE,
   ]);
-  const runId = await s.start();
+  // Identity I1: a stranger's request is refused before approval, so the requester here is
+  // Jamie's manager (Python used Jamie asking about Priya).
+  const runId = await s.start("reset Jamie's MFA", "morgan.hale@example.test");
   const pending = await s.pendingOf(runId);
   assert.equal(pending.requester_is_target, false);
-  assert.equal(pending.target, "priya.nair@example.test");
+  assert.equal(pending.target, JAMIE);
+  assert.equal(pending.requester, "morgan.hale@example.test");
   await s.decide(runId, { proposal_id: pending.id, decision: "deny" });
   await s.finished(runId);
 });
@@ -496,9 +499,9 @@ test("ts_web_approver_shows_requester_next_to_target_and_flags_mismatch", async 
     message([toolUse("reset_mfa", { email: JAMIE })], "tool_use"),
     DONE,
   ]);
-  const runId = await s.start("reset Jamie", "eli.novak@example.test");
+  const runId = await s.start("reset Jamie", "morgan.hale@example.test"); // Jamie's manager
   const pending = await s.pendingOf(runId);
-  assert.equal(pending.requester, "eli.novak@example.test");
+  assert.equal(pending.requester, "morgan.hale@example.test");
   assert.equal(pending.target, JAMIE);
   assert.equal(pending.requester_is_target, false);
   await s.decide(runId, { proposal_id: pending.id, decision: "deny" });
@@ -634,4 +637,25 @@ test("ts_an_approved_write_survives_a_restart", async () => {
   const jamie = store.directory?.users.find((u) => u.email === JAMIE);
   assert.equal(jamie?.mfa.enrolled, false); // the approved reset was kept
   assert.ok(!jamie?.groups.includes("design")); // the pending add never ran
+});
+
+test("ts_no_token_reaches_a_response_log_or_storage", async () => {
+  // Identity I1: a principal is minted per run from a signed token. The token must not
+  // appear in anything the page, the logs or storage can see.
+  const JWT = /eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*/;
+  const s = await makeSession(writeScript());
+  const runId = await s.start();
+  const pending = await s.pendingOf(runId);
+  await new Promise((r) => setTimeout(r, 1));
+  await s.decide(runId, { proposal_id: pending.id, decision: "approve" });
+  const final = await s.finished(runId);
+  const seen = [
+    final,
+    (await s.request("GET", "/api/log")).data,
+    s.store.audit,
+    s.store.calls,
+    s.store.runs,
+    s.store.directory,
+  ];
+  for (const item of seen) assert.doesNotMatch(JSON.stringify(item), JWT);
 });

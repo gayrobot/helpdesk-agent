@@ -14,6 +14,7 @@ import { PYTHON_UNICODE_VERSION, reprStr } from "../src/pycompat.ts";
 import { apiToolDefinitions, display, TOOLS, type ToolSpec } from "../src/tools.ts";
 import fixtures from "./fixtures/governance.json" with { type: "json" };
 import { FIXED_NOW, makeGate, withoutTs } from "./helpers.ts";
+import { predict, reachedApprover } from "./i1-oracle.ts";
 
 interface GateCase {
   name: string;
@@ -118,10 +119,17 @@ test("API tool definitions are identical", () => {
 });
 
 describe(`gate: ${F.gate.length} cases, outcome bytes, fingerprints, proposals and audit`, () => {
+  // Identity phase I1 changes some outcomes on purpose (reads of a stranger's record give
+  // the directory card; a stranger's write request is refused before approval). An
+  // independent oracle (test/i1-oracle.ts) predicts exactly which steps change and how.
+  // Every other step must still match Python byte for byte.
+  const changed: string[] = [];
+  const predictedChanged: string[] = [];
+
   for (const c of F.gate) {
     test(c.name, async () => {
       const proposals: Proposal[] = [];
-      const { gate, audit, escalations } = makeGate({
+      const { gate, audit, escalations } = await makeGate({
         requester: c.requester,
         ticketId: "T-PARITY",
         approver: async (p) => {
@@ -129,17 +137,42 @@ describe(`gate: ${F.gate.length} cases, outcome bytes, fingerprints, proposals a
           return c.approver === "approve";
         },
       });
+      const expectedProposals: unknown[] = [];
+      let proposalIndex = 0;
+      let caseDiverges = false;
       for (const [i, step] of c.steps.entries()) {
         const outcome = await gate.execute(step.tool, step.args);
         const expected = c.outcomes[i];
         assert.ok(expected);
-        assert.equal(outcome.decision, expected.decision);
-        assert.equal(outcome.isError, expected.is_error);
-        assert.equal(outcome.content, expected.content);
-        assert.deepEqual(await resultFingerprint(outcome.content), [
-          expected.result_sha256,
-          expected.result_bytes,
-        ]);
+        const prediction = predict(c.requester, step.tool, step.args, expected.decision);
+        const label = `${c.name} #${i}`;
+        if (outcome.content !== expected.content || outcome.decision !== expected.decision) {
+          changed.push(label);
+        }
+        if (reachedApprover(expected.decision)) {
+          if (prediction.kind !== "refused") expectedProposals.push(c.proposals[proposalIndex]);
+          proposalIndex++;
+        }
+        if (prediction.kind === "same") {
+          assert.equal(outcome.decision, expected.decision);
+          assert.equal(outcome.isError, expected.is_error);
+          assert.equal(outcome.content, expected.content);
+          assert.deepEqual(await resultFingerprint(outcome.content), [
+            expected.result_sha256,
+            expected.result_bytes,
+          ]);
+          continue;
+        }
+        caseDiverges = true;
+        predictedChanged.push(label);
+        if (prediction.kind === "card") {
+          assert.equal(outcome.decision, "allowed");
+          assert.equal(outcome.content, prediction.content);
+          assert.ok(!outcome.content.includes('"groups"') && !outcome.content.includes('"mfa"'));
+        } else {
+          assert.equal(outcome.decision, "denied_by_policy");
+          assert.ok(outcome.content.startsWith(prediction.contentPrefix), outcome.content);
+        }
       }
       assert.deepEqual(
         proposals.map((p) => ({
@@ -150,10 +183,23 @@ describe(`gate: ${F.gate.length} cases, outcome bytes, fingerprints, proposals a
           target: p.target,
           requester_is_target: p.requesterIsTarget,
         })),
-        c.proposals,
+        expectedProposals,
       );
-      assert.deepEqual(withoutTs(audit.records), c.audit);
+      if (caseDiverges) {
+        // The audit has one tool_call per step with the TypeScript decision.
+        assert.deepEqual(
+          audit.records.filter((r) => r.event === "tool_call").length,
+          c.steps.length,
+        );
+      } else {
+        assert.deepEqual(withoutTs(audit.records), c.audit);
+      }
       assert.deepEqual(escalations.saved, c.escalations);
     });
   }
+
+  test("the steps that changed are exactly the ones the oracle predicted", () => {
+    assert.deepEqual(changed.sort(), predictedChanged.sort());
+    assert.ok(predictedChanged.length > 50, "I1 should change many fixture steps");
+  });
 });

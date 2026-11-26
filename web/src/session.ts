@@ -27,6 +27,7 @@ import { type CallLog, type MessagesClient, ModelCaller } from "./client.ts";
 import type { RawDirectory } from "./data.ts";
 import { Directory } from "./directory.ts";
 import { EMAIL_PATTERN, Gate, type Outcome, type Proposal } from "./governance.ts";
+import { DevIssuer } from "./identity.ts";
 import { pyLen } from "./pycompat.ts";
 import { display, type EscalationRecord, type Retriever } from "./tools.ts";
 
@@ -87,6 +88,8 @@ export interface SessionOptions {
   now?: () => number;
   approvalTimeoutMs?: number;
   minReviewMs?: number;
+  /** Mints each run's requester token (identity phase I1). One per session if absent. */
+  issuer?: DevIssuer;
 }
 
 function randomHex(bytes: number): string {
@@ -134,9 +137,12 @@ class PanelGate extends Gate {
 export class Session {
   readonly requesters: { email: string; name: string }[];
   private readonly known: Set<string>;
-  private readonly opts: Required<Omit<SessionOptions, "client" | "store" | "retriever">> &
+  private readonly opts: Required<
+    Omit<SessionOptions, "client" | "store" | "retriever" | "issuer">
+  > &
     SessionOptions;
   private directory: Directory;
+  private issuer: DevIssuer | null = null;
   private readonly runs = new Map<string, Run>();
   private current: Run | null = null;
   private closed = false;
@@ -213,6 +219,10 @@ export class Session {
 
   private async work(run: Run, body: string): Promise<void> {
     try {
+      // Verified for this run only, and never stored: a restarted session rebuilds no
+      // identity from a stored email.
+      this.issuer ??= this.opts.issuer ?? new DevIssuer();
+      const principal = await this.issuer.principalFor(run.requester);
       const staged: Record<string, unknown>[] = [];
       const gate = new PanelGate({
         directory: this.directory,
@@ -221,7 +231,7 @@ export class Session {
         escalations: { save: (r) => this.opts.store.saveEscalation(r) },
         retriever: this.opts.retriever,
         ticketId: run.ticket_id,
-        requester: run.requester,
+        principal,
         clock: this.opts.clock,
       });
       gate.run = run;

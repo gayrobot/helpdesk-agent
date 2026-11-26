@@ -81,7 +81,7 @@ test("retrieval eval: same recall@3, MRR and misses", () => {
 describe(`search_runbooks through the gate: ${F.gate.length} queries`, () => {
   for (const c of F.gate) {
     test(c.name, async () => {
-      const { gate, audit } = makeGate({ retriever: bm25, ticketId: "T-PARITY" });
+      const { gate, audit } = await makeGate({ retriever: bm25, ticketId: "T-PARITY" });
       const step = c.steps[0] as { tool: string; args: unknown };
       const outcome = await gate.execute(step.tool, step.args);
       const expected = c.outcomes[0];
