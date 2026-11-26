@@ -14,7 +14,7 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 | 5 ✅ | Evals: 50–100 synthetic tickets in `evals/tickets.jsonl`, auto-deny approval stub, deterministic checks first, results in `evals/results/<date>.json` (see "Adversarial evals" below). Ticket set and scorer are built key-free. | Scorer passes on hand-written transcripts in CI |
 | 5 **live** | Run the agent over the ticket set; Haiku grader for free-text answer quality (grader prompt checked in at `src/helpdesk_agent/data/grader-prompt.md`, run with `eval --grade`; reported separately, never changes the deterministic pass rate) | One command prints pass rates by category, cost and latency, and a system prompt change shows a measurable difference |
 | 6 ✅ | Local web UI over the Python agent (see "Sequence from Phase 6") | Skylar runs tickets in a browser on localhost, sees cited runbook answers, and approves or denies a write |
-| 7 | TypeScript rewrite on Cloudflare Workers, at parity with the Python agent | The parity bar below is met |
+| 7 ✅ | TypeScript rewrite on Cloudflare Workers, at parity with the Python agent | The parity bar below is met |
 | 8 | Agent identity, built in TypeScript with Okta: phases I1–I5 in [identity-plan.md](identity-plan.md) | Each identity phase's own "done when" |
 | 9 | Public site: anonymous limited chat, persona sign-in, per-user agent permissions | Checks below pass on a preview deploy |
 | 10 | Deploy to `helpdesk-agent.damiano.dev` and publish the write-up | Live site; write-up published with real numbers; damiano.dev project entry merged |
@@ -42,6 +42,8 @@ Purpose: let Skylar see the existing agent work. It is a viewer over the Python 
   - Noise sample: [`evals/results/2026-11-25T153205Z.json`](../evals/results/2026-11-25T153205Z.json), same agent code on `3a5c326`, no grader: 61/62 (E025 `howto` failed; it passed in the run above), $0.63. Treat one ticket either way as run-to-run noise when comparing.
 
 ### Phase 7: TypeScript rewrite on Cloudflare Workers
+
+Done 2026-11-25: the parity bar is met (below), and Skylar ran the Worker live (`npm run dev:worker`): a how-to ticket answered with `Source: vpn-setup`, and an MFA reset for Marcus Reed approved on the page, with `write_approved` stored before the write. Five model calls, all with request ids, $0.0175 in total. The Python package stays as the reference implementation and is now frozen (no new features; Skylar decides later whether to delete it).
 
 Target stack, matching damiano.dev: a Worker in TypeScript, the official Anthropic TypeScript SDK, static assets for the UI, one Durable Object per session holding that visitor's copy of the fake directory and its audit trail, `wrangler`, deploys from GitHub Actions only.
 
