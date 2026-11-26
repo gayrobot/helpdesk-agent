@@ -85,13 +85,15 @@ The grader differs on one answer: E018's TypeScript reply added a sign-in detail
 
 ### Phase 8: agent identity
 
+**Okta is never a write target** (2026-11-25). It signs people in and issues tokens; `reset_mfa`, `add_to_group` and admin record edits still change only the session's copy of the directory. A test asserts tool handlers make no outbound network calls.
+
 Phases I1–I5 of `identity-plan.md`, in the TypeScript code. The local dev issuer stays for tests and CI; Okta (I5) is now in scope, not optional. I6 (MCP) stays optional.
 
 ### Phase 9: public site (a proof of concept)
 
 Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a helpdesk anyone uses. It exists to show three things a visitor can check: **who asked, what acted for them, and who said yes.**
 
-**Labelling.** Every page says what is real and what is simulated:
+**Labelling.** Every page says what is real and what is simulated. The approval card's effect line ends with "(simulated: changes this demo's copy only)", next to Approve. Every page says:
 - **Real:** the model, the governance code, the Okta sign-in, the audit trail and the eval numbers.
 - **Simulated:** Larkspur Labs, its directory, devices and runbooks. "Reset MFA" changes a flag in the visitor's own session copy and nothing else. A banner says the company is fictional and real details must not be entered.
 
