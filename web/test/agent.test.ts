@@ -22,7 +22,7 @@ async function runAgent(
 ) {
   const fake = new FakeClient(script);
   const calls = new MemoryCallLog();
-  const env = makeGate({
+  const env = await makeGate({
     ...(options.approver ? { approver: options.approver } : {}),
     requester: options.requester ?? JAMIE,
     ticketId: "T-1",
@@ -174,10 +174,11 @@ test("test_on_behalf_of_request_is_flagged_at_the_prompt", async () => {
       message([toolUse("reset_mfa", { email: JAMIE })], "tool_use"),
       message([text("ok")], "end_turn"),
     ],
-    { approver: approver.approve, requester: "eli.novak@example.test" },
+    // Jamie's manager: a stranger (Python used Eli) is now refused before approval.
+    { approver: approver.approve, requester: "morgan.hale@example.test" },
   );
   assert.equal(approver.proposals[0]?.requesterIsTarget, false);
-  assert.equal(approver.proposals[0]?.requester, "eli.novak@example.test");
+  assert.equal(approver.proposals[0]?.requester, "morgan.hale@example.test");
 });
 
 test("test_ticket_text_cannot_break_out_of_its_tags", () => {
@@ -241,7 +242,7 @@ test("ts_audit_failure_mid_run_stops_the_run", async () => {
     message([toolUse("lookup_user", { email: JAMIE })], "tool_use"),
     message([text("ok")], "end_turn"),
   ]);
-  const { gate } = makeGate();
+  const { gate } = await makeGate();
   (gate as unknown as { audit: unknown }).audit = {
     record: async () => {
       throw new Error("audit down");

@@ -10,6 +10,7 @@ import { costUsd, MemoryCallLog, ModelCaller } from "../src/client.ts";
 import { FakeClient, message, text, thinking, toolUse } from "./fakes.ts";
 import fixtures from "./fixtures/agent.json" with { type: "json" };
 import { JAMIE, makeGate, withoutTs } from "./helpers.ts";
+import { predict } from "./i1-oracle.ts";
 
 type BlockSpec = [string, ...unknown[]];
 interface Turn {
@@ -103,13 +104,38 @@ describe(`agent runs: ${F.runs.length} scripts`, () => {
     test(run.name, async () => {
       const fake = new FakeClient(script(run.turns));
       const calls = new MemoryCallLog();
-      const { gate, audit, escalations } = makeGate({
+      const { gate, audit, escalations } = await makeGate({
         requester: run.requester ?? JAMIE,
         ticketId: "T-AGENT",
         approver: async () => run.approver === "approve",
       });
       const result = await new Agent(new ModelCaller(fake, calls), gate).run(run.body ?? "help");
 
+      // Identity phase I1: predict, independently (test/i1-oracle.ts), which tool calls
+      // change. A run with none must match Python byte for byte.
+      const requester = run.requester ?? JAMIE;
+      const pyEvents = (run.result as { events: Record<string, unknown>[] }).events;
+      const predictions = pyEvents.map((e) =>
+        e.type === "tool_call"
+          ? predict(requester, String(e.tool), e.args, String(e.decision))
+          : ({ kind: "same" } as const),
+      );
+      if (predictions.some((p) => p.kind !== "same")) {
+        const tsEvents = JSON.parse(JSON.stringify(result)).events as Record<string, unknown>[];
+        assert.equal(tsEvents.length, pyEvents.length);
+        tsEvents.forEach((e, i) => {
+          const p = predictions[i];
+          if (p?.kind === "refused") assert.equal(e.decision, "denied_by_policy");
+          else if (p?.kind === "card") assert.equal(e.decision, "allowed");
+          else assert.deepEqual(e, pyEvents[i]);
+        });
+        // The model calls are scripted, so the call log still matches exactly.
+        assert.deepEqual(
+          calls.entries.map(({ latency_ms: _l, ...rest }) => rest),
+          run.calls,
+        );
+        return;
+      }
       assert.deepEqual(JSON.parse(JSON.stringify(result)), run.result);
       assert.equal(fake.requests.length, run.requests.length);
       for (const [i, req] of fake.requests.entries()) {

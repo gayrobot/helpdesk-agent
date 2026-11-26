@@ -110,7 +110,7 @@ test("test_eval_file_names_real_runbooks", () => {
 });
 
 test("test_search_runbooks_tool_through_the_gate", async () => {
-  const { gate, audit } = makeGate({ retriever: new BM25Retriever(chunks) });
+  const { gate, audit } = await makeGate({ retriever: new BM25Retriever(chunks) });
   const outcome = await gate.execute("search_runbooks", { query: "reset okta verify new phone" });
   assert.ok(!outcome.isError);
   const body = JSON.parse(outcome.content);

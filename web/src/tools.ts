@@ -12,6 +12,7 @@
  *
  * `governance.Gate` is the only caller, in that order.
  */
+import { isAuthorityGroup } from "./authz.ts";
 import type { Directory, User } from "./directory.ts";
 import { compactStamp, isOther, isoDate, isoSeconds, reprStr } from "./pycompat.ts";
 
@@ -224,7 +225,7 @@ function checkAddToGroup(ctx: ToolContext, args: Args): void {
   const name = arg(args, "group");
   // Deny privileged names before checking existence, so "admins-typo" style probes get
   // a policy answer rather than a hint about which groups exist.
-  if (ctx.directory.isPrivilegedGroup(name)) {
+  if (ctx.directory.isPrivilegedGroup(name) || isAuthorityGroup(name)) {
     throw new PolicyDenied(
       `${reprStr(name)} is a privileged group. The helpdesk agent never grants ` +
         "privileged access, even with approval; escalate to IT.",
