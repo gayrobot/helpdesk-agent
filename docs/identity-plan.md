@@ -38,9 +38,9 @@ Be straight about this in the code comments and in the write-up.
 
 | Principal | Identifier | Local (I1 to I4) | Okta (I5) |
 | --- | --- | --- | --- |
-| Requester | Directory email, as `sub` | Dev issuer mints a subject token | Device Authorization grant |
+| Requester | Directory email, as `sub` | Dev issuer mints a subject token | OIDC Authorization Code with PKCE on the site (tier 3); Device Authorization grant for command-line tools |
 | Agent | Client ID `helpdesk-agent`, as `act.sub` | Signs a client assertion with a key generated in memory at start | Service app using `private_key_jwt` |
-| Approver | Directory email, must be in `it-support` | Dev issuer mints an operator token | Device Authorization grant, separate sign-in |
+| Approver | Directory email, must be in `it-support` | Dev issuer mints an operator token | A separate sign-in, by the same flows as the requester |
 
 The agent is its own identity. It never borrows the user's token and never holds a standing credential that can write.
 
@@ -93,7 +93,7 @@ Rules for the verifier: one allowlisted algorithm per issuer; `none` and algorit
 
 The policy checks inside tools (privileged group, disabled account) still read the full record. Only what goes back to the model is filtered.
 
-**Who may ask for a write.** The target is the requester or the requester's direct report. Anything else is `DENIED_BY_POLICY` before the operator is asked. This moves the manager rule from the system prompt into code. It matches what the eval set already expects: E042 and E043 (managers) still reach the prompt; E044 to E047 are refused and escalate.
+**Who may ask for a write.** The target is the requester or the requester's direct report, or the requester is in `it-support` and asks for `reset_mfa` on an active, non-privileged user (added 2026-11-25 for the helpdesk role). Anything else is `DENIED_BY_POLICY` before the operator is asked. This moves the manager rule from the system prompt into code. It matches what the eval set already expects: E042 and E043 (managers) still reach the prompt; E044 to E047 are refused and escalate.
 
 **Who may approve.** The approver is in `it-support`, is not the requester, and is not the target. `deny_all` stays the approver for evals and CI.
 
@@ -158,6 +158,16 @@ Ticket set and scorer first, key-free, as in Phase 5. Add `forbidden_runbooks` a
 Signing and verifying need an asymmetric crypto library; the standard library has none. Write `docs/dependency-reviews/<name>.md` before adding anything. Compare PyJWT with `cryptography`, `joserfc` and Authlib on maintainers, release history, what each pulls in, and how each pins algorithms. Don't take a version number from this document. Resolve one that passes the 7-day cooldown.
 
 ## I5 notes: Okta
+
+**Updated 2026-11-25 (Skylar):** the site is a proof of concept with three tiers (`docs/plan.md`, Phase 9).
+- **Sign-in flow:** Okta sign-in is for tier 3 only (Skylar and invited reviewers, behind Cloudflare Access). On the site, sign-in uses OIDC Authorization Code with PKCE; the Device Authorization grant below stays for command-line tools.
+- **Public tier:** the guided demo (tier 2) uses the dev issuer, labelled as simulated, so the same enforcement code runs for every visitor.
+- **Approvals in the demo:** in tier 2, approval needs a *different* `it-support` persona, so the separation-of-duties rule is visible.
+- **Roles:**
+  - **helpdesk** is `it-support`: it approves writes and can ask the agent for MFA resets, so its scopes include `directory:mfa.reset`.
+  - **admin** is a new privileged group, `directory-admins` (Okta, tier 3 only): it can also edit user records through a human-only route. That is not an agent tool, and no delegated token ever carries an edit scope.
+- **Decision 2 (approver group)** is settled: `it-support`.
+- **Helpdesk-filed resets** (2026-11-25): a reset an `it-support` persona asks for needs a *different* `it-support` persona to approve. The demo's helpdesk side switches between two (e.g. Rosa Delgado and Theo Park), and the self-approval refusal shows on screen.
 
 Checked on 2026-11-24. Re-check against Okta's current docs before building.
 

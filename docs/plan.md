@@ -85,14 +85,58 @@ The grader differs on one answer: E018's TypeScript reply added a sign-in detail
 
 ### Phase 8: agent identity
 
+**Okta is never a write target** (2026-11-25). It signs people in and issues tokens; `reset_mfa`, `add_to_group` and admin record edits still change only the session's copy of the directory. A test asserts tool handlers make no outbound network calls.
+
 Phases I1–I5 of `identity-plan.md`, in the TypeScript code. The local dev issuer stays for tests and CI; Okta (I5) is now in scope, not optional. I6 (MCP) stays optional.
 
-### Phase 9: public site
+### Phase 9: public site (a proof of concept)
 
-- **Anonymous:** a page saying what the project is, plus limited chat: runbook questions only (`search_runbooks` and the reply, no directory reads, no writes), a cheap model, Turnstile, rate limits per IP and per day.
-- **Signed in (Okta):** demo personas, e.g. an engineer, a manager and an IT approver. The agent acts for the signed-in persona with that persona's permissions only, as I1–I4 define. Writes change only that session's Durable Object.
-- **Who may sign in** (decide here): personas open to any visitor, or only Skylar and invited reviewers behind Cloudflare Access.
-- No visitor text in logs beyond what is needed to debug, and a banner that the company is fictional and real details must not be entered.
+Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a helpdesk anyone uses. It exists to show three things a visitor can check: **who asked, what acted for them, and who said yes.**
+
+**Labelling.** Every page says what is real and what is simulated. The approval card's effect line ends with "(simulated: changes this demo's copy only)", next to Approve. Every page says:
+- **Real:** the model, the governance code, the Okta sign-in, the audit trail and the eval numbers.
+- **Simulated:** Larkspur Labs, its directory, devices and runbooks. "Reset MFA" changes a flag in the visitor's own session copy and nothing else. A banner says the company is fictional and real details must not be entered.
+
+**Three tiers:**
+
+| Tier | Who | What they can do | Identity |
+| --- | --- | --- | --- |
+| 1. Anonymous | Anyone | The explainer page, plus runbook questions only (`search_runbooks` and the reply; no directory reads, no writes). Haiku. | none |
+| 2. Guided demo | Anyone | A requester persona on the left and a **helpdesk** persona (`it-support`) on the right. The helpdesk side can approve the requester's write, or ask the agent itself to reset MFA for an ordinary user, as a test of agent permissions (below). The I1–I4 rules hold: reads filtered by role, a stranger's write refused before approval, and no one approves their own request: a reset the helpdesk files needs the *other* helpdesk persona's Approve (the right side switches between two, e.g. Rosa Delgado and Theo Park). Writes change only that session's Durable Object. | The dev issuer, labelled "simulated sign-in" on the page |
+| 3. Real sign-in | Skylar and invited reviewers, behind Cloudflare Access | Everything in tier 2, signed in through Okta with per-tool scoped tokens, and the right side is an **admin**, who can also edit user records directly (below) | Okta (I5) |
+
+**Agent permissions, the point of tier 2** (decided 2026-11-25):
+- **What the agent may do follows the role.** It holds only the scopes of the role it acts for, one call at a time (I2's delegated tokens). For the helpdesk role that is directory reads, runbook search, escalation and `directory:mfa.reset`.
+- **What the visitor sees:** the helpdesk persona asks the agent to reset MFA for an ordinary user; its own Approve is refused (self-approval), and the second helpdesk persona's Approve runs the reset. Asked to reset MFA for a privileged account, add someone to a privileged group, or change a user's record, the agent can't: the call is refused in code, and the page shows which rule refused it.
+
+**Admin record edits, tier 3 only** (decided 2026-11-25):
+- **What:** the signed-in admin (Okta, in a new privileged group `directory-admins`, which the agent can never grant) can edit a user's record in the session's directory. The motivating case is removing the planted instruction from Eli Novak's title, so a visitor sees the injection, sees it handled safely, then cleans the data at the source.
+- **A human action, not an agent tool.** Edits go through a form on the admin side and a separate API route that checks the admin's Okta token. The model never gets a tool for it, so the agent's permissions don't grow.
+- **Guarded like a write:**
+  - each edit is validated (the same email and mixed-alphabet rules, length limits)
+  - it is audited with the admin's identity and the before and after values
+  - it changes only that session's copy
+  - it can't edit email addresses (they are the identity key) or group membership (that goes through `add_to_group` and the approval rules)
+
+**The signed-in screen is split** (tiers 2 and 3, decided 2026-11-25):
+- **Left, the requester:** the ticket box, the reply with its `Source:` line, and the requester's own view of what happened.
+- **Right, the helpdesk (tier 2) or admin (tier 3):** the operator's view: the approval queue with the full proposal (tool, arguments, effect, requester, target, the mismatch flag), Approve and Deny, the tool-call panel with each result and its fingerprint, and the session's audit trail.
+- **Each side has its own identity.** The left is signed in as the requester persona, the right as the helpdesk or admin persona, each with its own token, and the API checks which side a request comes from. The left side can't approve, and only the right side can run resets for other people or edit records, so separation of duties shows on screen instead of being described.
+- **On a phone** the two sides stack, with a toggle between them.
+- **Honesty:** one visitor drives both sides, so the split proves the rule (the approver's identity is not the requester's), not that two different people were involved.
+
+**Why Okta personas aren't open to the public:** that would mean publishing passwords to a real identity tenant. Anyone could then change a persona's password or MFA or lock it out, and it would run into the free plan's user limits. Tier 2 shows the same enforcement code to everyone; tier 3 shows the authentication is real, to people Skylar chooses.
+
+**Cost controls.** On a site with no real data, spend is the real risk:
+- a separate Console workspace with a low spend limit
+- a cap on tickets per session, and limits per IP per day
+- Turnstile on tier 1
+- `max_tokens` as today
+- a kill switch (a Worker variable) that turns model calls off
+
+**Data.**
+- Each session's Durable Object deletes its storage about 24 hours after its last use (a Durable Object alarm).
+- No visitor text in logs beyond that session.
 - The model never sees a token, an approval receipt, a session cookie or the key.
 
 ### Phase 10: deploy and write-up

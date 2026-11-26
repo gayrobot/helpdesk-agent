@@ -4,6 +4,10 @@ A small, governed IT helpdesk agent on the Claude API. It answers IT requests fo
 
 **All data is synthetic.** No real people, credentials or company data.
 
+**Nothing here acts on a real system.** The tools never call a real identity provider, directory or device manager. `reset_mfa` and `add_to_group` change only an in-memory copy of `src/helpdesk_agent/data/directory.json` (per ticket in the Python agent, per browser session in the Worker). No one's MFA is ever reset and no one is added to a real group. Okta (Phase 8) is used only to sign people in to the demo and issue tokens, never as a target for writes.
+
+The tool descriptions and system prompt deliberately don't say "simulated": they're what the agent was evaluated with, so the model's replies read as if the action happened. The page labels it instead.
+
 Status: Phase 3 built against a mocked client; live calls start when API credits arrive. See [docs/plan.md](docs/plan.md). Manual, owner-only steps are in [docs/operator-checklist.md](docs/operator-checklist.md).
 
 ## Governance model
