@@ -87,7 +87,9 @@ The grader differs on one answer: E018's TypeScript reply added a sign-in detail
 
 **Okta is never a write target** (2026-11-25). It signs people in and issues tokens; `reset_mfa`, `add_to_group` and admin record edits still change only the session's copy of the directory. A test asserts tool handlers make no outbound network calls.
 
-Phases I1–I5 of `identity-plan.md`, in the TypeScript code. The local dev issuer stays for tests and CI; Okta (I5) is now in scope, not optional. I6 (MCP) stays optional.
+Phases I1–I5 of `identity-plan.md`, in the TypeScript code.
+
+**I1 done 2026-11-26** (PRs #33 and the I1 part 2 PR): the requester is a verified `Principal` from a signed token, the gate refuses anything else, and `authz.ts` enforces who may see and ask for what. Full graded TypeScript run with I1 ([`ts-2026-11-26T013556Z.json`](../evals/results/ts-2026-11-26T013556Z.json)): 62/62, every category 100%, grader 8/14 (unchanged), $0.0101 per ticket. `scripts/compare_results.py` against the TypeScript baseline: met. Three self-request tickets (E005, E008, E010) changed between escalating and answering after the auto-deny; that is the model, not I1, and all three still pass. E042 and E043 (managers) still reach the approver. In E044–E047 the model looked the users up and escalated without attempting the write. The local dev issuer stays for tests and CI; Okta (I5) is now in scope, not optional. I6 (MCP) stays optional.
 
 ### Phase 9: public site (a proof of concept)
 
