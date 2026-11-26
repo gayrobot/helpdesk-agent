@@ -13,5 +13,17 @@
   // Locally the key comes only from the environment that `op run` sets: wrangler reads a
   // required secret from process.env. Never put it in .dev.vars or any other file.
   "secrets": { "required": ["ANTHROPIC_API_KEY"] },
-  "dev": { "ip": "127.0.0.1" }
+  "dev": { "ip": "127.0.0.1" },
+  // The page. Only /api/* runs the Worker; everything else is a static file or a 404.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "none"
+  },
+  // One Durable Object per visitor session (src/worker/session-object.ts).
+  "durable_objects": {
+    "bindings": [{ "name": "SESSIONS", "class_name": "HelpdeskSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession"] }]
 }

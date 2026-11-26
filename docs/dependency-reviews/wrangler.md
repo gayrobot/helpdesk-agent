@@ -51,7 +51,7 @@ The rest are small utilities: source maps, colours, cookie parsing, `semver`, `p
   - `send_metrics: false` in `wrangler.jsonc` turns telemetry off.
 - **Loopback only.** The launcher binds 127.0.0.1, and `wrangler.jsonc` sets `dev.ip` to the same.
 - **No deploys.** `workers_dev` and `preview_urls` are off. `npm run build:worker` is `wrangler deploy --dry-run`: it bundles and stops, with no login. Deploys come in Phase 10, from GitHub Actions only.
-- **Dev only.** Wrangler never runs in the deployed Worker. The bundle is the project's code plus the SDK: 123 KB, 32 KB gzipped.
+- **Dev only.** Wrangler never runs in the deployed Worker. The bundle is the project's code plus the Anthropic SDK: 1.25 MB, 229 KB gzipped (slice 6b; 123 KB before the SDK was imported).
 
 ## Alternatives considered
 

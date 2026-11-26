@@ -1,0 +1,22 @@
+// Test build only: the real client against a stub API on localhost (test/worker-real.test.ts).
+{
+  "name": "helpdesk-agent-real-client-test",
+  "main": "real-entry.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "send_metrics": false,
+  "workers_dev": false,
+  "preview_urls": false,
+  // Both come from the test process's environment, as the real key does under op run.
+  "secrets": { "required": ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"] },
+  "assets": {
+    "directory": "../../public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "SESSIONS", "class_name": "HelpdeskSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession"] }]
+}

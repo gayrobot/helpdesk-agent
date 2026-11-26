@@ -8,6 +8,6 @@
     "types": ["@cloudflare/workers-types"],
     "lib": ["es2024"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "test/worker/**/*.ts", "test/fakes.ts"],
   "exclude": ["src/node/**"]
 }
