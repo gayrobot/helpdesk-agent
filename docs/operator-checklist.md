@@ -11,7 +11,7 @@ Checked on 2026-11-13. Facts marked "verified" came from `gh api` calls and read
 | Actor | Can do | Never does |
 | --- | --- | --- |
 | Skylar | Everything below: Console, 1Password, GitHub settings, Cloudflare, merging PRs, typing `y` at the write gate | — |
-| Claude Code | Code, tests, docs, PRs, read-only `gh api` checks, live `op run` commands (key check, `ping`, `eval`; allowed by Skylar on 2026-11-19) | Read `.env*`, run `op read` / `op item get` / `op inject`, print the key or the environment, answer a write-gate prompt, change repo settings unless Skylar asks in the session, deploy |
+| Claude Code | Code, tests, docs, PRs, read-only `gh api` checks, live `op run` commands (key check, `ping`, `eval`; allowed by Skylar on 2026-11-19); deploying `hddemo.damiano.dev` with Skylar's local wrangler login, creating its Turnstile widget and setting its Worker secrets (allowed 2026-11-26) | Read `.env*`, run `op read` / `op item get` / `op inject`, print the key or the environment, answer a write-gate prompt, change repo settings unless Skylar asks in the session, deploy anything else, click Approve on the deployed site, sign in to Okta |
 | CI | Lint, format, unit tests (mocked client, `ANTHROPIC_API_KEY=""`), gitleaks | Call the real API |
 
 ## 1. When the credits land (around 2026-11-18)

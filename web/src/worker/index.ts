@@ -11,8 +11,10 @@ import { makeRealClient } from "./anthropic.ts";
 import { type Env, safeRoute } from "./routes.ts";
 import { sessionObjectClass } from "./session-object.ts";
 
+export { Budget } from "./budget-object.ts";
+
 export const HelpdeskSession = sessionObjectClass(makeRealClient);
 
 export default {
-  fetch: (request, env) => safeRoute(request, env),
+  fetch: (request, env) => safeRoute(request, env, makeRealClient),
 } satisfies ExportedHandler<Env>;

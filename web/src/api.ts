@@ -38,8 +38,9 @@ export function json(status: number, body: unknown): Response {
 
 const error = (status: number, message: string) => json(status, { error: message });
 
-/** `Host` must be this server, on a loopback name. */
-export function hostOk(request: Request): boolean {
+/** `Host` must be this server, on a loopback name or one of `extraHosts` (the public
+ * site's hostname, from configuration). */
+export function hostOk(request: Request, extraHosts: ReadonlySet<string> = new Set()): boolean {
   const host = request.headers.get("Host") ?? "";
   const url = new URL(request.url);
   let hostname: string;
@@ -48,10 +49,15 @@ export function hostOk(request: Request): boolean {
   } catch {
     return false;
   }
-  return host === url.host && LOCAL_HOSTNAMES.has(hostname);
+  return host === url.host && (LOCAL_HOSTNAMES.has(hostname) || extraHosts.has(hostname));
 }
 
 /** POSTs must come from this page's own origin. */
+/** True when the request came to a loopback address (local development, never production). */
+export function isLocal(request: Request): boolean {
+  return LOCAL_HOSTNAMES.has(new URL(request.url).hostname);
+}
+
 export const originOk = (request: Request): boolean =>
   request.headers.get("Origin") === new URL(request.url).origin;
 

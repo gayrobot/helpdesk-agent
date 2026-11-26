@@ -265,3 +265,83 @@ test("ts_restart_mid_proposal_comes_back_interrupted_with_no_write", async () =>
     rmSync(state, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------- the public site (tier 1)
+
+async function raw(
+  host: string,
+  method: string,
+  path: string,
+  headers: Record<string, string> = {},
+  body?: string,
+) {
+  const { request } = await import("node:http");
+  return new Promise<{ status: number; body: Record<string, unknown> }>((resolve, reject) => {
+    const req = request(
+      { host: HOST, port: Number(base.port), path, method, headers: { Host: host, ...headers } },
+      (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          let parsed: Record<string, unknown> = {};
+          try {
+            parsed = JSON.parse(data);
+          } catch {}
+          resolve({ status: res.statusCode ?? 0, body: parsed });
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
+test("ts_config_on_loopback_uses_the_turnstile_test_key_and_shows_the_demo", async () => {
+  const config = await (await fetch(new URL("/api/config", base))).json();
+  assert.deepEqual(config, {
+    turnstileSiteKey: "1x00000000000000000000AA",
+    answersOn: true,
+    tiers: { ask: true, demo: true, signIn: false },
+  });
+});
+
+test("ts_on_the_public_hostname_tier_2_is_off_and_ask_is_guarded", async () => {
+  const site = "demo.example.test";
+  const config = await raw(site, "GET", "/api/config");
+  assert.equal(config.status, 200);
+  assert.deepEqual(config.body.tiers, { ask: true, demo: false, signIn: false });
+  assert.equal(config.body.turnstileSiteKey, "test-sitekey");
+  const json = { "Content-Type": "application/json", Origin: `http://${site}` };
+  // The split-screen demo's API doesn't exist on the public hostname yet.
+  assert.equal((await raw(site, "POST", "/api/sessions", json, "{}")).status, 404);
+  assert.equal(
+    (await raw(site, "GET", "/api/current", { "X-Helpdesk-Session": "0".repeat(64) })).status,
+    404,
+  );
+  // /api/ask without Cloudflare's visitor IP header, and without a Turnstile token.
+  const question = JSON.stringify({ question: "How do I set up the VPN?" });
+  assert.equal((await raw(site, "POST", "/api/ask", json, question)).status, 403);
+  const withIp = { ...json, "CF-Connecting-IP": "203.0.113.7" };
+  assert.equal((await raw(site, "POST", "/api/ask", withIp, question)).status, 403);
+  // Wrong origin, and a host that isn't the site.
+  assert.equal(
+    (await raw(site, "POST", "/api/ask", { ...withIp, Origin: "http://evil.example" }, question))
+      .status,
+    403,
+  );
+  assert.equal((await raw("evil.example", "GET", "/api/config")).status, 403);
+});
+
+test("ts_each_page_has_its_own_security_policy", async () => {
+  const csp = async (path: string) =>
+    (await fetch(new URL(path, base))).headers.get("content-security-policy") ?? "";
+  const home = await csp("/");
+  const ask = await csp("/ask/");
+  const demo = await csp("/demo/");
+  assert.ok(!home.includes("challenges.cloudflare.com"));
+  assert.ok(!demo.includes("challenges.cloudflare.com"));
+  assert.ok(ask.includes("script-src 'self' https://challenges.cloudflare.com"));
+  assert.ok(ask.includes("frame-src https://challenges.cloudflare.com"));
+  assert.equal(ask.split("Content-Security-Policy").length, 1); // one policy, not two joined
+  assert.ok(!ask.includes("script-src 'self';"));
+});

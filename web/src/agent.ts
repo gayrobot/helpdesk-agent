@@ -88,11 +88,26 @@ function textOf(content: readonly BetaContentBlock[]): string {
 }
 
 /** The first request's content, without calling anything (used by dry runs). */
-export function buildFirstRequest(ticketId: string, requester: string, body: string) {
+export interface AgentProfile {
+  /** Defaults to SYSTEM_PROMPT. */
+  systemPrompt?: string;
+  /** Tool names offered to the model; defaults to all. The gate must allow the same set. */
+  toolNames?: ReadonlySet<string>;
+}
+
+export function buildFirstRequest(
+  ticketId: string,
+  requester: string,
+  body: string,
+  profile: AgentProfile = {},
+) {
+  const tools = apiToolDefinitions().filter(
+    (t) => !profile.toolNames || profile.toolNames.has(t.name),
+  );
   return {
-    system: SYSTEM_PROMPT,
+    system: profile.systemPrompt ?? SYSTEM_PROMPT,
     messages: [{ role: "user", content: renderTicket(ticketId, requester, body) }],
-    tools: apiToolDefinitions(),
+    tools,
   } satisfies RequestInput;
 }
 
@@ -105,10 +120,18 @@ export class Agent {
   readonly gate: Gate;
   readonly maxToolTurns: number;
 
-  constructor(caller: ModelCaller, gate: Gate, maxToolTurns = MAX_TOOL_TURNS) {
+  readonly profile: AgentProfile;
+
+  constructor(
+    caller: ModelCaller,
+    gate: Gate,
+    maxToolTurns = MAX_TOOL_TURNS,
+    profile: AgentProfile = {},
+  ) {
     this.caller = caller;
     this.gate = gate;
     this.maxToolTurns = maxToolTurns;
+    this.profile = profile;
   }
 
   get ticketId(): string {
@@ -120,7 +143,7 @@ export class Agent {
   }
 
   async run(body: string): Promise<AgentResult> {
-    const request = buildFirstRequest(this.ticketId, this.requester, body);
+    const request = buildFirstRequest(this.ticketId, this.requester, body, this.profile);
     const messages: BetaMessageParam[] = [...request.messages] as BetaMessageParam[];
     const result: AgentResult = {
       ticket_id: this.ticketId,

@@ -18,6 +18,13 @@ export async function startLocalWorker(port: number, configPath?: string, persis
   // Read by wrangler when the worker starts; set here so no one has to remember them.
   process.env.X_LOCAL_EXPLORER = "false";
   process.env.WRANGLER_SEND_METRICS = "false";
+  // Local development defaults for the site's switches (never used in production, where
+  // they are Worker secrets): model calls on, Cloudflare's always-pass Turnstile test
+  // secret, a fixed salt. wrangler reads required secrets from this environment.
+  process.env.MODEL_CALLS ??= "on";
+  process.env.TURNSTILE_SECRET ??= "1x0000000000000000000000000000000AA";
+  process.env.VISITOR_SALT ??= "local-dev";
+  process.env.TURNSTILE_SITEKEY ??= "1x00000000000000000000AA";
   const { unstable_startWorker } = await import("wrangler");
   const worker = await unstable_startWorker({
     config: configPath ?? new URL("../../wrangler.jsonc", import.meta.url).pathname,
@@ -25,6 +32,9 @@ export async function startLocalWorker(port: number, configPath?: string, persis
       inspector: false,
       server: { hostname: HOST, port },
       watch: false,
+      // Keep the real local origin: with the hddemo.damiano.dev route, wrangler would
+      // otherwise make local requests look like production (and switch tier 2 off).
+      inferOriginFromRoutes: false,
       ...(persist ? { persist } : {}),
     },
   });

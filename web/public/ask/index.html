@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask a runbook question: Helpdesk agent</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/ask/ask.js" defer></script>
+</head>
+<body>
+  <div class="banner" role="note">Proof of concept. Larkspur Labs is fictional. Don't enter real details: questions go to an AI model and aren't stored here.</div>
+  <header>
+    <p class="meta"><a href="/">← Helpdesk agent</a></p>
+    <h1>Ask a runbook question</h1>
+    <p class="lede">How-to questions for Larkspur Labs employees, answered from the IT runbooks. This page can't look up or change accounts.</p>
+  </header>
+  <main>
+    <section class="card" aria-labelledby="ask-heading">
+      <h2 id="ask-heading">Your question</h2>
+      <label for="question" class="visually-hidden">Question</label>
+      <textarea id="question" rows="3" maxlength="600" placeholder="e.g. How do I set up the VPN on my laptop?"></textarea>
+      <p class="meta">Try: "How do I re-enroll Okta Verify on a new phone?", "What should I do if I get a phishing email?"</p>
+      <div id="turnstile" class="turnstile"></div>
+      <div class="row">
+        <button id="ask" type="button" disabled>Ask</button>
+        <span id="status" role="status"></span>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="answer-heading" id="answer-card" hidden>
+      <h2 id="answer-heading">Answer</h2>
+      <div id="answer" class="reply"></div>
+      <p id="source" class="source" hidden></p>
+      <p id="searches" class="meta"></p>
+    </section>
+  </main>
+</body>
+</html>
