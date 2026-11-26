@@ -12,6 +12,7 @@
  *
  * `governance.Gate` is the only caller, in that order.
  */
+import { isAudienceRetriever, readerGroups } from "./acl.ts";
 import { isAuthorityGroup } from "./authz.ts";
 import type { Directory, User } from "./directory.ts";
 import { compactStamp, isOther, isoDate, isoSeconds, reprStr } from "./pycompat.ts";
@@ -174,7 +175,11 @@ async function listDevices(ctx: ToolContext, args: Args): Promise<ToolResult> {
 
 async function searchRunbooks(ctx: ToolContext, args: Args): Promise<ToolResult> {
   const query = arg(args, "query");
-  const hits = ctx.retriever.search(query, TOP_K);
+  // Identity phase I3: search only what this requester may read, by their groups now.
+  const retriever = isAudienceRetriever(ctx.retriever)
+    ? ctx.retriever.forReader(readerGroups(ctx.directory, ctx.requester))
+    : ctx.retriever;
+  const hits = retriever.search(query, TOP_K);
   const results = hits.map((h) => ({
     runbook: h.runbook,
     title: h.title,

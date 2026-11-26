@@ -20,7 +20,7 @@ import { formatGraderSummary, Grader } from "../grader.ts";
 import { MemoryEscalations } from "../memory.ts";
 import { pyFixed } from "../pycompat.ts";
 import { FileAudit, FileCallLog } from "./files.ts";
-import { defaultRetriever, loadRunbooks } from "./runbooks.ts";
+import { defaultAclRetriever, loadRunbooks } from "./runbooks.ts";
 
 const REPO = new URL("../../../", import.meta.url);
 
@@ -89,7 +89,7 @@ export async function main(argv: string[], deps: EvalDeps = {}): Promise<number>
     callLog,
     audit: new FileAudit(at("logs/ts/eval-audit.jsonl")),
     escalations: new MemoryEscalations(), // discarded, as Python's temp directory is
-    retriever: defaultRetriever(),
+    retriever: defaultAclRetriever(),
     grader,
     onTicket: (ticket, score) => {
       const failed = Object.entries(score.checks)
