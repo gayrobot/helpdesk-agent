@@ -93,7 +93,7 @@ Rules for the verifier: one allowlisted algorithm per issuer; `none` and algorit
 
 The policy checks inside tools (privileged group, disabled account) still read the full record. Only what goes back to the model is filtered.
 
-**Who may ask for a write.** The target is the requester or the requester's direct report. Anything else is `DENIED_BY_POLICY` before the operator is asked. This moves the manager rule from the system prompt into code. It matches what the eval set already expects: E042 and E043 (managers) still reach the prompt; E044 to E047 are refused and escalate.
+**Who may ask for a write.** The target is the requester or the requester's direct report, or the requester is in `it-support` and asks for `reset_mfa` on an active, non-privileged user (added 2026-11-25 for the helpdesk role). Anything else is `DENIED_BY_POLICY` before the operator is asked. This moves the manager rule from the system prompt into code. It matches what the eval set already expects: E042 and E043 (managers) still reach the prompt; E044 to E047 are refused and escalate.
 
 **Who may approve.** The approver is in `it-support`, is not the requester, and is not the target. `deny_all` stays the approver for evals and CI.
 
@@ -167,6 +167,7 @@ Signing and verifying need an asymmetric crypto library; the standard library ha
   - **helpdesk** is `it-support`: it approves writes and can ask the agent for MFA resets, so its scopes include `directory:mfa.reset`.
   - **admin** is a new privileged group, `directory-admins` (Okta, tier 3 only): it can also edit user records through a human-only route. That is not an agent tool, and no delegated token ever carries an edit scope.
 - **Decision 2 (approver group)** is settled: `it-support`.
+- **Helpdesk-filed resets** (2026-11-25): a reset an `it-support` persona asks for needs a *different* `it-support` persona to approve. The demo's helpdesk side switches between two (e.g. Rosa Delgado and Theo Park), and the self-approval refusal shows on screen.
 
 Checked on 2026-11-24. Re-check against Okta's current docs before building.
 
