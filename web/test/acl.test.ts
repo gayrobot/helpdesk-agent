@@ -175,7 +175,7 @@ test("ts_i3_hidden_matches_are_byte_identical_to_no_matches", async () => {
   const b = await sharedOnly.gate.execute("search_runbooks", { query: QUERY });
   assert.equal(a.content, b.content);
   assert.ok(!CANARY.test(a.content));
-  const strip = ({ grant: _g, ...r }: Record<string, unknown>) => r;
+  const strip = ({ grant: _g, prev: _p, hash: _h, ...r }: Record<string, unknown>) => r;
   assert.deepEqual(
     strip(withRestricted.audit.records.at(-1) as Record<string, unknown>),
     strip(sharedOnly.audit.records.at(-1) as Record<string, unknown>),

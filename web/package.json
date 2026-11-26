@@ -16,6 +16,7 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build:worker",
     "eval-retrieval": "node src/node/eval-retrieval.ts",
     "eval": "node src/node/eval.ts",
+    "audit:verify": "node src/node/audit-verify.ts",
     "dev:worker": "node src/node/dev-worker.ts",
     "build:worker": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },

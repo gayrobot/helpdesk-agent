@@ -22,7 +22,7 @@
  */
 import { Agent } from "./agent.ts";
 import type { AuditSink } from "./audit.ts";
-import { buildRecord } from "./audit.ts";
+import { buildRecord, GENESIS, HashChain } from "./audit.ts";
 import { type CallLog, type MessagesClient, ModelCaller } from "./client.ts";
 import type { RawDirectory } from "./data.ts";
 import { Directory } from "./directory.ts";
@@ -90,7 +90,16 @@ export interface SessionOptions {
   minReviewMs?: number;
   /** Mints each run's requester token (identity phase I1). One per session if absent. */
   issuer?: DevIssuer;
+  /**
+   * Who answers this session's approvals (identity phase I4): a synthetic it-support
+   * persona, signed in for each run. The gate refuses them before asking if they filed
+   * the request or own the account being changed.
+   */
+  operator?: string;
 }
+
+/** The local page's approver until tier 2 lets the page switch helpdesk personas. */
+export const DEFAULT_OPERATOR = "theo.park@example.test";
 
 function randomHex(bytes: number): string {
   const b = crypto.getRandomValues(new Uint8Array(bytes));
@@ -138,11 +147,12 @@ export class Session {
   readonly requesters: { email: string; name: string }[];
   private readonly known: Set<string>;
   private readonly opts: Required<
-    Omit<SessionOptions, "client" | "store" | "retriever" | "issuer">
+    Omit<SessionOptions, "client" | "store" | "retriever" | "issuer" | "operator">
   > &
     SessionOptions;
   private directory: Directory;
   private issuer: DevIssuer | null = null;
+  private chain: Promise<HashChain> | null = null;
   private readonly runs = new Map<string, Run>();
   private current: Run | null = null;
   private closed = false;
@@ -223,6 +233,7 @@ export class Session {
       // identity from a stored email.
       this.issuer ??= this.opts.issuer ?? new DevIssuer();
       const signIn = await this.issuer.signIn(run.requester);
+      const operator = await this.issuer.signIn(this.opts.operator ?? DEFAULT_OPERATOR);
       const staged: Record<string, unknown>[] = [];
       const gate = new PanelGate({
         directory: this.directory,
@@ -232,6 +243,7 @@ export class Session {
         retriever: this.opts.retriever,
         ticketId: run.ticket_id,
         signIn,
+        operator,
         clock: this.opts.clock,
       });
       gate.run = run;
@@ -263,7 +275,12 @@ export class Session {
     return {
       record: async (event, fields) => {
         // Stored first: if that fails the gate fails closed, as with the audit file.
-        await this.opts.store.appendAudit(buildRecord(event, fields, this.opts.clock()));
+        // Chained to the session's previous record (identity phase I4).
+        this.chain ??= this.opts.store
+          .readLog()
+          .then(({ audit }) => new HashChain(String(audit.at(-1)?.hash ?? GENESIS)));
+        const linked = await (await this.chain).link(buildRecord(event, fields, this.opts.clock()));
+        await this.opts.store.appendAudit(linked);
         // An approved write has just changed the directory: store it now, so a restart
         // can't lose a write the operator approved. A failure here fails the run.
         if (event === "tool_call" && fields.decision === "approved") {
