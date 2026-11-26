@@ -163,6 +163,10 @@ Signing and verifying need an asymmetric crypto library; the standard library ha
 - **Sign-in flow:** Okta sign-in is for tier 3 only (Skylar and invited reviewers, behind Cloudflare Access). On the site, sign-in uses OIDC Authorization Code with PKCE; the Device Authorization grant below stays for command-line tools.
 - **Public tier:** the guided demo (tier 2) uses the dev issuer, labelled as simulated, so the same enforcement code runs for every visitor.
 - **Approvals in the demo:** in tier 2, approval needs a *different* `it-support` persona, so the separation-of-duties rule is visible.
+- **Roles:**
+  - **helpdesk** is `it-support`: it approves writes and can ask the agent for MFA resets, so its scopes include `directory:mfa.reset`.
+  - **admin** is a new privileged group, `directory-admins` (Okta, tier 3 only): it can also edit user records through a human-only route. That is not an agent tool, and no delegated token ever carries an edit scope.
+- **Decision 2 (approver group)** is settled: `it-support`.
 
 Checked on 2026-11-24. Re-check against Okta's current docs before building.
 

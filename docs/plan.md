@@ -100,13 +100,26 @@ Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a
 | Tier | Who | What they can do | Identity |
 | --- | --- | --- | --- |
 | 1. Anonymous | Anyone | The explainer page, plus runbook questions only (`search_runbooks` and the reply; no directory reads, no writes). Haiku. | none |
-| 2. Guided demo | Anyone | Pick a persona (an engineer, a manager, an IT approver) and watch the I1–I4 rules hold: reads filtered by role, a stranger's write refused before approval, and approval by a *different* `it-support` persona, so separation of duties is visible. Writes change only that session's Durable Object. | The dev issuer, labelled "simulated sign-in" on the page |
-| 3. Real sign-in | Skylar and invited reviewers, behind Cloudflare Access | The same as tier 2, signed in through Okta, with per-tool scoped tokens | Okta (I5) |
+| 2. Guided demo | Anyone | A requester persona on the left and a **helpdesk** persona (`it-support`) on the right. The helpdesk side can run an MFA reset through the agent and approve it, as a test of agent permissions (below). The I1–I4 rules hold: reads filtered by role, a stranger's write refused before approval, and approval only by the helpdesk persona, never the requester. Writes change only that session's Durable Object. | The dev issuer, labelled "simulated sign-in" on the page |
+| 3. Real sign-in | Skylar and invited reviewers, behind Cloudflare Access | Everything in tier 2, signed in through Okta with per-tool scoped tokens, and the right side is an **admin**, who can also edit user records directly (below) | Okta (I5) |
+
+**Agent permissions, the point of tier 2** (decided 2026-11-25):
+- **What the agent may do follows the role.** It holds only the scopes of the role it acts for, one call at a time (I2's delegated tokens). For the helpdesk role that is directory reads, runbook search, escalation and `directory:mfa.reset`.
+- **What the visitor sees:** the helpdesk persona can ask the agent to reset MFA for an ordinary user and approve it, and the reset runs. Asked to reset MFA for a privileged account, add someone to a privileged group, or change a user's record, the agent can't: the call is refused in code, and the page shows which rule refused it.
+
+**Admin record edits, tier 3 only** (decided 2026-11-25):
+- **What:** the signed-in admin (Okta, in a new privileged group `directory-admins`, which the agent can never grant) can edit a user's record in the session's directory. The motivating case is removing the planted instruction from Eli Novak's title, so a visitor sees the injection, sees it handled safely, then cleans the data at the source.
+- **A human action, not an agent tool.** Edits go through a form on the admin side and a separate API route that checks the admin's Okta token. The model never gets a tool for it, so the agent's permissions don't grow.
+- **Guarded like a write:**
+  - each edit is validated (the same email and mixed-alphabet rules, length limits)
+  - it is audited with the admin's identity and the before and after values
+  - it changes only that session's copy
+  - it can't edit email addresses (they are the identity key) or group membership (that goes through `add_to_group` and the approval rules)
 
 **The signed-in screen is split** (tiers 2 and 3, decided 2026-11-25):
 - **Left, the requester:** the ticket box, the reply with its `Source:` line, and the requester's own view of what happened.
-- **Right, the admin:** the IT approver's view: the approval queue with the full proposal (tool, arguments, effect, requester, target, the mismatch flag), Approve and Deny, the tool-call panel with each result and its fingerprint, and the session's audit trail.
-- **Each side has its own identity.** The left is signed in as the requester persona, the right as an `it-support` persona, each with its own token, and the API checks which side a request comes from. The right side can't file tickets and the left side can't approve, so separation of duties shows on screen instead of being described.
+- **Right, the helpdesk (tier 2) or admin (tier 3):** the operator's view: the approval queue with the full proposal (tool, arguments, effect, requester, target, the mismatch flag), Approve and Deny, the tool-call panel with each result and its fingerprint, and the session's audit trail.
+- **Each side has its own identity.** The left is signed in as the requester persona, the right as the helpdesk or admin persona, each with its own token, and the API checks which side a request comes from. The left side can't approve, and only the right side can run resets for other people or edit records, so separation of duties shows on screen instead of being described.
 - **On a phone** the two sides stack, with a toggle between them.
 - **Honesty:** one visitor drives both sides, so the split proves the rule (the approver's identity is not the requester's), not that two different people were involved.
 
