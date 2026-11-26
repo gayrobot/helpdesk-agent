@@ -16,7 +16,16 @@
     "not_found_handling": "none"
   },
   "durable_objects": {
-    "bindings": [{ "name": "SESSIONS", "class_name": "HelpdeskSession" }]
+    "bindings": [
+      { "name": "SESSIONS", "class_name": "HelpdeskSession" },
+      { "name": "BUDGET", "class_name": "Budget" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession", "Budget"] }],
+  // Test values only: Cloudflare's always-pass Turnstile test secret, model calls on.
+  "vars": {
+    "MODEL_CALLS": "on",
+    "TURNSTILE_SECRET": "1x0000000000000000000000000000000AA",
+    "VISITOR_SALT": "test"
+  }
 }

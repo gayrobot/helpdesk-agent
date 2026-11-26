@@ -166,6 +166,8 @@ export interface GateOptions {
    */
   principal: Principal;
   clock?: () => Date;
+  /** Restrict the allowlist further (the anonymous tier allows only search_runbooks). */
+  allowedTools?: ReadonlySet<string>;
 }
 
 interface FinishOptions {
@@ -178,6 +180,7 @@ interface FinishOptions {
 export class Gate {
   readonly ctx: ToolContext;
   readonly principal: Principal;
+  private readonly allowedTools: ReadonlySet<string> | null;
   private readonly approver: Approver;
   private readonly audit: AuditSink;
 
@@ -190,6 +193,7 @@ export class Gate {
       throw new TypeError("requester must be a lowercase @example.test address");
     }
     this.principal = options.principal;
+    this.allowedTools = options.allowedTools ?? null;
     this.approver = options.approver;
     this.audit = options.audit;
     this.ctx = {
@@ -207,7 +211,10 @@ export class Gate {
   }
 
   async execute(name: string, args: unknown): Promise<Outcome> {
-    const spec = typeof name === "string" ? TOOLS.get(name) : undefined;
+    const spec =
+      typeof name === "string" && (!this.allowedTools || this.allowedTools.has(name))
+        ? TOOLS.get(name)
+        : undefined;
     if (spec === undefined) {
       return this.finish(name, null, args, Decision.UNKNOWN_TOOL, `Unknown tool ${pyRepr(name)}.`, {
         error: true,

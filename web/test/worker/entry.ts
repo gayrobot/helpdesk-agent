@@ -25,11 +25,13 @@ function loopingClient(): MessagesClient {
   };
 }
 
+export { Budget } from "../../src/worker/budget-object.ts";
+
 export const HelpdeskSession = sessionObjectClass(loopingClient, {
   minReviewMs: 200,
   approvalTimeoutMs: 10_000,
 });
 
 export default {
-  fetch: (request, env) => safeRoute(request, env),
+  fetch: (request, env) => safeRoute(request, env, loopingClient),
 } satisfies ExportedHandler<Env>;

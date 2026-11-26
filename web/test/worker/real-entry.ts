@@ -5,11 +5,13 @@ import { makeRealClient } from "../../src/worker/anthropic.ts";
 import { type Env, safeRoute } from "../../src/worker/routes.ts";
 import { sessionObjectClass } from "../../src/worker/session-object.ts";
 
+export { Budget } from "../../src/worker/budget-object.ts";
+
 export const HelpdeskSession = sessionObjectClass(makeRealClient, {
   minReviewMs: 200,
   approvalTimeoutMs: 10_000,
 });
 
 export default {
-  fetch: (request, env) => safeRoute(request, env),
+  fetch: (request, env) => safeRoute(request, env, makeRealClient),
 } satisfies ExportedHandler<Env>;

@@ -3,63 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Helpdesk agent (Worker, local)</title>
+  <title>Helpdesk agent: a governed AI agent, as a proof of concept</title>
+  <meta name="description" content="A proof of concept: an IT helpdesk agent on Claude whose every action is governed in code.">
   <link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
 </head>
 <body>
+  <div class="banner" role="note">Proof of concept. Larkspur Labs is a fictional company and every person, device and runbook here is invented. Don't enter real details.</div>
   <header>
     <h1>Helpdesk agent</h1>
-    <p class="note">Local only. Larkspur Labs is fictional; every user and device here is synthetic.</p>
+    <p class="lede">An IT helpdesk agent built on Claude, where every action it takes is governed in code: who asked, what acted for them, and who said yes.</p>
   </header>
-
   <main>
-    <section class="card" aria-labelledby="ticket-heading">
-      <h2 id="ticket-heading">New ticket</h2>
-      <label for="requester">Requester</label>
-      <select id="requester" required></select>
-      <label for="ticket">Ticket</label>
-      <textarea id="ticket" rows="5" maxlength="8000" placeholder="Describe the problem"></textarea>
-      <div class="row">
-        <button id="send" type="button">Run ticket</button>
-        <span id="form-status" role="status"></span>
+    <section class="card">
+      <h2>Try it</h2>
+      <div class="tiers">
+        <a class="tier" href="/ask/">
+          <strong>Ask a runbook question</strong>
+          <span>Anyone. How-to questions answered from the company's IT runbooks, with the runbook cited. It can't look up or change accounts.</span>
+        </a>
+        <div class="tier disabled" aria-disabled="true">
+          <strong>Helpdesk demo</strong>
+          <span>Coming soon. A requester on the left, helpdesk staff on the right: watch the agent's permissions follow the role, and approvals need a different person.</span>
+        </div>
+        <div class="tier disabled" aria-disabled="true">
+          <strong>Sign in</strong>
+          <span>Coming soon, for invited reviewers: real sign-in through Okta, with an admin view.</span>
+        </div>
       </div>
     </section>
-
-    <section id="approval" class="card approval" hidden aria-live="assertive" aria-labelledby="approval-heading">
-      <h2 id="approval-heading">Approval required</h2>
-      <dl>
-        <dt>Tool</dt><dd id="p-tool"></dd>
-        <dt>Arguments</dt><dd><pre id="p-args"></pre></dd>
-        <dt>Effect</dt><dd id="p-effect"></dd>
-        <dt>Requester</dt><dd id="p-requester"></dd>
-        <dt>Target</dt><dd id="p-target"></dd>
+    <section class="card">
+      <h2>What's real and what's simulated</h2>
+      <dl class="real">
+        <dt>Real</dt>
+        <dd>The model (Claude), the governance code that decides what runs, the audit trail, and the evaluation results.</dd>
+        <dt>Simulated</dt>
+        <dd>The company, its people, devices and runbooks. In the helpdesk demo, "reset MFA" changes a flag in your own session's copy of the directory and nothing else.</dd>
       </dl>
-      <p id="p-match"></p>
-      <div class="row">
-        <button id="approve" type="button" class="approve">Approve this write</button>
-        <button id="deny" type="button" class="deny">Deny</button>
-      </div>
     </section>
-
-    <section class="card" aria-labelledby="reply-heading">
-      <h2 id="reply-heading">Reply <span id="run-status" class="badge"></span></h2>
-      <p id="run-meta" class="meta"></p>
-      <div id="reply" class="reply"></div>
-      <p id="source" class="source" hidden></p>
-    </section>
-
-    <section class="card" aria-labelledby="calls-heading">
-      <h2 id="calls-heading">Tool calls</h2>
-      <table>
-        <colgroup>
-          <col class="c-num"><col class="c-tool"><col class="c-args"><col class="c-decision"><col class="c-reason">
-        </colgroup>
-        <thead><tr><th>#</th><th>Tool</th><th>Arguments</th><th>Decision</th><th>Reason</th></tr></thead>
-        <tbody id="calls"></tbody>
-      </table>
-      <p id="no-calls" class="meta">None yet.</p>
+    <section class="card">
+      <h2>How it's governed</h2>
+      <ul>
+        <li>The model proposes; code decides. Unknown tools are refused, arguments are checked against strict rules, and privileged groups can never be granted.</li>
+        <li>Every write waits for a person to approve it. Some requests are refused before anyone is asked: a stranger can't request changes to your account.</li>
+        <li>Who is asking is a verified identity, not a typed name. What the agent may see and do follows that person's role.</li>
+        <li>Ticket text, directory fields and runbook text are treated as data, never as instructions. One runbook and one user record carry planted prompt injections on purpose.</li>
+        <li>Every model call and tool call is logged, and each tool result is fingerprinted so what the model saw can be proved later.</li>
+      </ul>
     </section>
   </main>
+  <footer><p class="meta">The agent was written in Python first, then rewritten in TypeScript for Cloudflare Workers and checked against the Python version's results.</p></footer>
 </body>
 </html>

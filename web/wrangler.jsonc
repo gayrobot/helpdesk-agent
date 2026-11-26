@@ -12,7 +12,19 @@
   "preview_urls": false,
   // Locally the key comes only from the environment that `op run` sets: wrangler reads a
   // required secret from process.env. Never put it in .dev.vars or any other file.
-  "secrets": { "required": ["ANTHROPIC_API_KEY"] },
+  // Secrets: the API key; MODEL_CALLS ("on" enables model calls, anything else or unset
+  // means off); the Turnstile widget's secret and site key (the site key isn't sensitive,
+  // it's set the same way so the widget can be created after the Worker exists); the
+  // salt for hashing visitor IPs.
+  "secrets": {
+    "required": [
+      "ANTHROPIC_API_KEY",
+      "MODEL_CALLS",
+      "TURNSTILE_SECRET",
+      "TURNSTILE_SITEKEY",
+      "VISITOR_SALT"
+    ]
+  },
   "dev": { "ip": "127.0.0.1" },
   // The page. Only /api/* runs the Worker; everything else is a static file or a 404.
   "assets": {
@@ -23,7 +35,14 @@
   },
   // One Durable Object per visitor session (src/worker/session-object.ts).
   "durable_objects": {
-    "bindings": [{ "name": "SESSIONS", "class_name": "HelpdeskSession" }]
+    "bindings": [
+      { "name": "SESSIONS", "class_name": "HelpdeskSession" },
+      { "name": "BUDGET", "class_name": "Budget" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession", "Budget"] }],
+  // The public site (Phase 9, tier 1 for now). Deployed from this machine by Claude Code
+  // with Skylar's local wrangler login (allowed 2026-11-26).
+  "routes": [{ "pattern": "hddemo.damiano.dev", "custom_domain": true }],
+  "vars": { "SITE_HOSTNAME": "hddemo.damiano.dev" }
 }

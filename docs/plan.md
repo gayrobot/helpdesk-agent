@@ -129,6 +129,11 @@ Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a
 
 **Why Okta personas aren't open to the public:** that would mean publishing passwords to a real identity tenant. Anyone could then change a persona's password or MFA or lock it out, and it would run into the free plan's user limits. Tier 2 shows the same enforcement code to everyone; tier 3 shows the authentication is real, to people Skylar chooses.
 
+**Deploy, decided 2026-11-26 (Skylar):**
+- **Where:** the site is `hddemo.damiano.dev`, deployed by Claude Code from this machine with Skylar's wrangler login, and it ships tier by tier.
+- **Tier 1 first:** tier 1 goes live before Phase 8 finishes. Tier 2 follows identity I2–I4, and tier 3 waits for Okta (I5).
+- **The API key:** the site reuses the development key. That workspace has no Console spend limit, so the Worker's own budget is the cap.
+
 **Cost controls.** On a site with no real data, spend is the real risk:
 - a separate Console workspace with a low spend limit
 - a cap on tickets per session, and limits per IP per day
