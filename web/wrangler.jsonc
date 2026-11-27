@@ -45,5 +45,7 @@
   // The public site (Phase 9, tiers 1 and 2). Deployed from this machine by Claude Code
   // with Skylar's local wrangler login (allowed 2026-11-26).
   "routes": [{ "pattern": "hddemo.damiano.dev", "custom_domain": true }],
-  "vars": { "SITE_HOSTNAME": "hddemo.damiano.dev" }
+  // BUDGET_DAILY_USD: the site's daily dollar cap (tiers 1 and 2 together), raised from
+  // the code default of $2 by Skylar's decision on 2026-11-27.
+  "vars": { "SITE_HOSTNAME": "hddemo.damiano.dev", "BUDGET_DAILY_USD": "5" }
 }
