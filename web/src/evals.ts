@@ -233,7 +233,7 @@ export async function runTickets(
   for (const ticket of tickets) {
     // The requester is verified, not typed: a token from the dev issuer, checked by its
     // verifier. Minted per ticket and never stored.
-    const principal = await issuer.principalFor(ticket.requester);
+    const signIn = await issuer.signIn(ticket.requester);
     const gate = new Gate({
       directory: Directory.load(), // fresh copy per ticket
       approver: denyAll,
@@ -241,7 +241,7 @@ export async function runTickets(
       escalations: options.escalations,
       retriever: options.retriever,
       ticketId: ticket.id,
-      principal,
+      signIn,
     });
     const start = log.entries.length;
     const result = await new Agent(new ModelCaller(client, log), gate).run(ticket.body);

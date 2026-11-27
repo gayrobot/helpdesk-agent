@@ -54,7 +54,7 @@ export async function makeGate(
   const directory = options.directory ?? Directory.load();
   const audit = options.audit ?? new MemoryAudit(() => FIXED_NOW);
   const escalations = options.escalations ?? new MemoryEscalations();
-  const principal = await principalFor(options.requester ?? JAMIE);
+  const signIn = await TEST_ISSUER.signIn(options.requester ?? JAMIE);
   const gate = new Gate({
     directory,
     approver: options.approver ?? denyAll,
@@ -62,13 +62,16 @@ export async function makeGate(
     escalations,
     retriever: options.retriever ?? new StubRetriever(),
     ticketId: options.ticketId ?? "T-TEST",
-    principal,
+    signIn,
     clock: () => FIXED_NOW,
   });
   return { gate, directory, audit, escalations };
 }
 
-/** Audit records without the timestamp, for comparing with Python's. */
+/**
+ * Audit records without the timestamp, for comparing with Python's. The I2 `grant` field
+ * (the delegated token's id and scope) has no Python counterpart and is dropped too.
+ */
 export function withoutTs(records: { ts: string }[]): Record<string, unknown>[] {
-  return records.map(({ ts: _ts, ...rest }) => rest);
+  return records.map(({ ts: _ts, grant: _grant, ...rest }: Record<string, unknown>) => rest);
 }

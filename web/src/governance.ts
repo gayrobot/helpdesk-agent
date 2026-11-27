@@ -23,8 +23,9 @@
  */
 import type { AuditSink } from "./audit.ts";
 import { card, mayRequest, readView } from "./authz.ts";
+import { GrantError, runWithGrant, toolGrant } from "./delegation.ts";
 import { type Directory, isMixedScript, normalize } from "./directory.ts";
-import { Principal } from "./identity.ts";
+import { type Grant, type Principal, SignIn, TokenError } from "./identity.ts";
 import { compareCodePoints, pyJsonDumps, pyLen, pyRepr, pyStrip } from "./pycompat.ts";
 import {
   type Args,
@@ -161,10 +162,11 @@ export interface GateOptions {
   retriever: Retriever;
   ticketId: string;
   /**
-   * Who filed the ticket: a verified identity (identity phase I1), never a string. The
-   * model never supplies it, and `Gate` refuses anything that isn't a real `Principal`.
+   * Who filed the ticket, signed in: a verified principal (identity phase I1) plus the
+   * subject token the harness exchanges for one delegated token per call (I2). Never a
+   * string; the model never supplies it, and `Gate` refuses anything an issuer didn't make.
    */
-  principal: Principal;
+  signIn: SignIn;
   clock?: () => Date;
   /** Restrict the allowlist further (the anonymous tier allows only search_runbooks). */
   allowedTools?: ReadonlySet<string>;
@@ -175,24 +177,27 @@ interface FinishOptions {
   summary?: string | null;
   approval?: Approval;
   reason?: string | null;
+  grant?: Grant | null;
 }
 
 export class Gate {
   readonly ctx: ToolContext;
   readonly principal: Principal;
+  private readonly signIn: SignIn;
   private readonly allowedTools: ReadonlySet<string> | null;
   private readonly approver: Approver;
   private readonly audit: AuditSink;
 
   constructor(options: GateOptions) {
-    if (!Principal.is(options.principal)) {
-      throw new TypeError("Gate needs a verified Principal, not a string or a copy");
+    if (!SignIn.is(options.signIn)) {
+      throw new TypeError("Gate needs a SignIn from an issuer, not a string or a copy");
     }
-    const requester = options.principal.sub;
+    const requester = options.signIn.principal.sub;
     if (!EMAIL_PATTERN.test(requester)) {
       throw new TypeError("requester must be a lowercase @example.test address");
     }
-    this.principal = options.principal;
+    this.signIn = options.signIn;
+    this.principal = options.signIn.principal;
     this.allowedTools = options.allowedTools ?? null;
     this.approver = options.approver;
     this.audit = options.audit;
@@ -309,11 +314,34 @@ export class Gate {
       });
     }
 
+    // Identity phase I2: a fresh delegated token for exactly this call, verified by the
+    // handler side before the tool runs. A refused grant changes nothing.
     let result: Record<string, unknown>;
     let summary: string;
+    let grant: Grant;
     try {
-      [result, summary] = await spec.run(this.ctx, valid);
+      const needed = toolGrant(name);
+      let token: string;
+      try {
+        token = await this.signIn.grant(needed.audience, needed.scope, this.ctx.ticketId);
+      } catch (exc) {
+        if (exc instanceof TokenError) throw new GrantError(`exchange refused: ${exc.message}`);
+        throw exc;
+      }
+      const ran = await runWithGrant(spec, this.ctx, valid, token, this.signIn.resources);
+      [result, summary] = ran.result;
+      grant = ran.grant;
     } catch (exc) {
+      if (exc instanceof GrantError) {
+        return this.finish(
+          name,
+          spec,
+          valid,
+          Decision.INTERNAL_ERROR,
+          "Internal error; nothing was changed. Escalate this ticket.",
+          { error: true, summary: "GrantError", approval, reason: exc.message },
+        );
+      }
       if (exc instanceof ToolError) {
         return this.finish(name, spec, valid, Decision.TOOL_ERROR, exc.message, {
           error: true,
@@ -339,6 +367,7 @@ export class Gate {
       summary,
       approval,
       reason,
+      grant,
     });
   }
 
@@ -374,7 +403,13 @@ export class Gate {
     args: unknown,
     decision: Decision,
     content: string,
-    { error = false, summary = null, approval = Approval.NOT_ASKED, reason = null }: FinishOptions,
+    {
+      error = false,
+      summary = null,
+      approval = Approval.NOT_ASKED,
+      reason = null,
+      grant = null,
+    }: FinishOptions,
   ): Promise<Outcome> {
     const [sha256, size] = await resultFingerprint(content);
     await this.audit.record("tool_call", {
@@ -390,6 +425,18 @@ export class Gate {
       summary: summary || content,
       result_sha256: sha256,
       result_bytes: size,
+      // I2: which delegated token the call ran under, by its id. Never the token itself.
+      ...(grant
+        ? {
+            grant: {
+              sub: grant.sub,
+              act: grant.act,
+              aud: grant.aud,
+              scope: grant.scope,
+              jti: grant.jti,
+            },
+          }
+        : {}),
     });
     return { decision, content, isError: error };
   }
