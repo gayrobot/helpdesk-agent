@@ -28,9 +28,30 @@ import { EMAIL_PATTERN } from "./governance.ts";
 export const DEV_ISSUER = "urn:savory-air:dev-issuer";
 export const AGENT_AUDIENCE = "helpdesk-agent";
 export const SUBJECT_TOKEN_SECONDS = 15 * 60;
-const MAX_CLOCK_SKEW_SECONDS = 30;
-const ALGORITHMS = { ES256: { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256", bytes: 64 } };
+export const MAX_CLOCK_SKEW_SECONDS = 30;
+/** The algorithms a verifier can be configured with. ES256 for our own keys; RS256 only
+ * because Okta signs with it (identity phase I5). The caller picks one; the token never does. */
+const ALGORITHMS = {
+  ES256: { name: "ECDSA", hash: "SHA-256" },
+  RS256: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+} as const;
 export type Algorithm = keyof typeof ALGORITHMS;
+/** The smallest RSA key accepted anywhere. */
+export const MIN_RSA_BITS = 2048;
+
+/** The exact signature length for this algorithm and key, or throw if the key doesn't fit. */
+function signatureBytes(algorithm: Algorithm, key: Key): number {
+  const keyAlg = key.algorithm as { name?: string; namedCurve?: string; modulusLength?: number };
+  if (keyAlg.name !== ALGORITHMS[algorithm].name)
+    throw new TokenError("key does not match algorithm");
+  if (algorithm === "ES256") {
+    if (keyAlg.namedCurve !== "P-256") throw new TokenError("key does not match algorithm");
+    return 64;
+  }
+  const bits = keyAlg.modulusLength ?? 0;
+  if (bits < MIN_RSA_BITS || bits % 8 !== 0) throw new TokenError("RSA key too small");
+  return bits / 8;
+}
 
 /** Web Crypto key types, named here so the code compiles under Node and Workers types. */
 export type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
@@ -84,7 +105,27 @@ function decodeJsonSegment(segment: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-// ---------------------------------------------------------------- JWS (compact, ES256)
+// ---------------------------------------------------------------- JWS (compact, ES256 or RS256)
+
+/** Public keys looked up by the header's `kid`, from a key set fixed by configuration
+ * (Okta's JWKS, `okta.ts`). Never a key the token supplies or points at. */
+export interface KeySet {
+  key(kid: string): Promise<Key>;
+}
+
+const KID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** As `verifyJwsSignature`, with the key chosen from `keys` by the header's `kid`. */
+export async function verifyJwsWithKeySet(
+  token: string,
+  keys: KeySet,
+  algorithm: Algorithm,
+): Promise<{ header: Record<string, unknown>; payload: Uint8Array }> {
+  if (typeof token !== "string") throw new TokenError("token is not a string");
+  const header = decodeJsonSegment(token.split(".")[0] ?? "");
+  if (typeof header.kid !== "string" || !KID.test(header.kid)) throw new TokenError("bad kid");
+  return verifyJwsSignature(token, await keys.key(header.kid), algorithm);
+}
 
 /** Verify a compact JWS signature only (no claim checks). The algorithm comes from the
  * caller, never the header; a header naming anything else is refused. */
@@ -104,7 +145,9 @@ export async function verifyJwsSignature(
   }
   const signature = b64urlDecode(s);
   const alg = ALGORITHMS[algorithm];
-  if (signature.length !== alg.bytes) throw new TokenError("bad signature length");
+  if (signature.length !== signatureBytes(algorithm, key)) {
+    throw new TokenError("bad signature length");
+  }
   const ok = await crypto.subtle.verify(
     { name: alg.name, hash: alg.hash },
     key,
@@ -214,6 +257,53 @@ export class TokenVerifier {
   }
 }
 
+// ---------------------------------------------------------------- Okta subject tokens (I5)
+
+export interface OktaSubjectVerifierConfig {
+  /** The custom authorization server, e.g. `https://<org>.okta.com/oauth2/<id>`. */
+  issuer: string;
+  /** That server's audience (Okta gives each server one). */
+  audience: string;
+  /** The sign-in app's client id: only tokens it obtained count as a sign-in. */
+  clientId: string;
+  keys: KeySet;
+  /** The longest access token lifetime accepted, in seconds. */
+  maxLifetimeSeconds: number;
+  now?: () => number;
+}
+
+/**
+ * Verifies an Okta access token from the sign-in app and returns the principal it names.
+ * Same strictness as `TokenVerifier`, with Okta's shape: RS256 with a key from the
+ * configured JWKS by `kid`, `cid` naming the sign-in app, and `sub` the user's login,
+ * which must be a directory email (so an Okta admin account can't sign in as a requester).
+ * A delegated token (one with `act`) is refused here: a grant is not a sign-in.
+ */
+export class OktaSubjectVerifier {
+  private readonly config: Required<OktaSubjectVerifierConfig>;
+
+  constructor(config: OktaSubjectVerifierConfig) {
+    this.config = { now: () => Math.floor(Date.now() / 1000), ...config };
+  }
+
+  async verify(token: string): Promise<Principal> {
+    const { issuer, audience, clientId, keys, maxLifetimeSeconds, now } = this.config;
+    const { payload } = await verifyJwsWithKeySet(token, keys, "RS256");
+    const claims = parseClaims(payload);
+    requireClaims(claims, ["iss", "sub", "aud", "exp", "iat", "jti", "cid"]);
+    if (claims.iss !== issuer) throw new TokenError("wrong issuer");
+    if (claims.aud !== audience) throw new TokenError("wrong audience"); // exactly, not an array
+    if (claims.cid !== clientId) throw new TokenError("not issued to the sign-in app");
+    if ("act" in claims) throw new TokenError("a delegated token is not a sign-in");
+    if (typeof claims.sub !== "string" || !EMAIL_PATTERN.test(claims.sub)) {
+      throw new TokenError("subject is not a directory email");
+    }
+    if (typeof claims.jti !== "string" || !claims.jti) throw new TokenError("bad jti");
+    checkTimes(claims, now(), maxLifetimeSeconds);
+    return new Principal(MINT, claims.sub, issuer, claims.jti);
+  }
+}
+
 // ---------------------------------------------------------------- delegated tokens (I2)
 
 /** The agent's client id: `act.sub` in every delegated token. */
@@ -237,7 +327,7 @@ export const RESOURCE_SCOPES: Readonly<Record<string, readonly string[]>> = {
 
 const randomJti = () => b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
 
-function parseClaims(payload: Uint8Array): Record<string, unknown> {
+export function parseClaims(payload: Uint8Array): Record<string, unknown> {
   try {
     const parsed = JSON.parse(fromUtf8(payload));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
@@ -247,14 +337,14 @@ function parseClaims(payload: Uint8Array): Record<string, unknown> {
   }
 }
 
-function requireClaims(claims: Record<string, unknown>, names: string[]) {
+export function requireClaims(claims: Record<string, unknown>, names: string[]) {
   for (const name of names) {
     if (!(name in claims)) throw new TokenError(`missing claim ${name}`);
   }
 }
 
 /** exp, iat and nbf checks shared by assertions and grants. */
-function checkTimes(claims: Record<string, unknown>, now: number, maxLifetime: number) {
+export function checkTimes(claims: Record<string, unknown>, now: number, maxLifetime: number) {
   if (!isInt(claims.exp) || !isInt(claims.iat))
     throw new TokenError("exp and iat must be integers");
   if (claims.exp <= now - MAX_CLOCK_SKEW_SECONDS) throw new TokenError("token expired");
