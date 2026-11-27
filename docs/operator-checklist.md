@@ -41,12 +41,30 @@ None of this can start before the credits are on the account. Do it the day they
 Skylar, by hand. Nothing uses it until Phase 8 (identity phase I5), but it's created early so the rewrite can be designed around it.
 
 - [x] **Create an Okta Integrator Free Plan org** at developer.okta.com. Use it only for this project. (Done by 2026-11-25.)
-- [ ] **Sign in with phishing-resistant MFA** on your own admin account (a passkey or WebAuthn key).
-- [ ] **Put nothing real in it.** Only the synthetic Larkspur users and groups, loaded later by a script from `directory.json`. No real people, no connections to other orgs, no production apps.
-- [ ] **Store the org URL in 1Password** (e.g. a new `HelpDeskAgent-Okta` item). Client IDs and the agent's private key go in the same item later and are referenced from `.env.tpl`; never paste them into a terminal, chat or file.
+- [x] **Sign in with phishing-resistant MFA** on your own admin account (a passkey or WebAuthn key). (Done by 2026-11-27.)
+- [ ] **Put nothing real in it.** Only the synthetic Larkspur users and groups, loaded later by a script from `directory.json`. No real people, no connections to other orgs, no production apps. (Open: the 1Password item is named "Personal Okta Developer Tenant", so confirm this org holds nothing else before anything is seeded.)
+- [x] **Store the org URL in 1Password.** It is in `Nerd Shit` → `Personal Okta Developer Tenant`, with your admin username. Client IDs and the agent's key go in an item referenced from `.env.tpl`; never paste them into a terminal, chat or file. (Done by 2026-11-27.)
 - [ ] **Note:** `example.test` addresses can't receive activation email, so the synthetic users' passwords will be set by you, through the admin console or the seeding script.
 
 Claude Code never signs in to this org, never completes a device sign-in, and never creates or reads its credentials.
+
+## 1c. Identity I5: setting up Okta (added 2026-11-27)
+
+Skylar, by hand, in the Okta admin console, after the open decisions in `docs/identity-plan.md` (I5 notes) are settled. Everything here is OIDC / OAuth 2.0; there is no SAML.
+
+- [ ] **Custom authorization server.** Use `default` or create `larkspur-helpdesk`, with audience `api://larkspur-helpdesk`. Add the scopes `directory:read`, `devices:read`, `directory:mfa.reset`, `directory:group.add`, `runbooks:read`, `tickets:escalate`. Add an access policy: a new free org's server may have none. Set the shortest access token lifetime Okta allows, and write the number down here.
+- [ ] **Sign-in app** (tier 3): an OIDC app integration, Authorization Code with PKCE, sign-in redirect `https://hddemo.damiano.dev/auth/callback` (that route lands in a later PR). Assign only the synthetic users.
+- [ ] **Agent app:** an API Services app integration with the Token Exchange grant (Grant type → Advanced). Client authentication: public key / private key if Okta offers it for this grant, otherwise client secret. Make the authorization server trust itself for the exchange (Trusted servers), as in Okta's token exchange guide.
+- [ ] **Users:** only the synthetic personas chosen for tier 3, each with an `@example.test` login and a password you set. Never give a synthetic user an Okta admin role.
+- [ ] **1Password:** put the issuer URL, both client IDs, and the agent's key or secret in one item (for example `HelpDeskAgent-Okta` in `Nerd Shit`). Then add references to `.env.tpl` yourself (Claude Code doesn't open that file):
+
+  ```
+  OKTA_ISSUER=op://Nerd Shit/HelpDeskAgent-Okta/issuer
+  OKTA_SIGNIN_CLIENT_ID=op://Nerd Shit/HelpDeskAgent-Okta/signin-client-id
+  OKTA_AGENT_CLIENT_ID=op://Nerd Shit/HelpDeskAgent-Okta/agent-client-id
+  ```
+
+  Rename the item and fields to whatever you use. The agent's secret stays out of `.env.tpl` until the code that needs it lands.
 
 ## 2. GitHub hygiene
 
