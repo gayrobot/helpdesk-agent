@@ -247,6 +247,14 @@ export class Gate {
       }
     }
     this.operators = options.operators ? Object.freeze([...options.operators]) : null;
+    // One issuer per gate (decided 2026-11-27): a dev-issuer approver can't answer for an
+    // Okta requester, nor the other way round.
+    const issuer = options.signIn.principal.issuer;
+    for (const o of [this.operator, ...(this.operators ?? [])]) {
+      if (o && o.principal.issuer !== issuer) {
+        throw new TypeError("every operator must come from the requester's issuer");
+      }
+    }
     this.receipts = new ReceiptAuthority();
     this.principal = options.signIn.principal;
     this.allowedTools = options.allowedTools ?? null;

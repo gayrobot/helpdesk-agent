@@ -9,6 +9,9 @@
  *   (key rotation), so a stream of forged `kid`s can't turn the verifier into a fetch loop.
  * - `OktaGrantVerifier`: the resource side for tokens from Okta's On-Behalf-Of token
  *   exchange. Same checks as `GrantVerifier` where Okta's tokens allow them.
+ * - `OktaResources`: one authorization server and one audience stand in for all three of
+ *   the dev issuer's resource servers (decided 2026-11-27, Skylar). Resources are kept
+ *   apart by scope alone: every grant carries exactly the one scope its tool needs.
  *
  * Differences from the dev issuer's grants, written down rather than papered over:
  * - **No `ticket_id` claim.** Okta takes no custom claim from the request without a token
@@ -30,7 +33,9 @@ import {
   type KeySet,
   MIN_RSA_BITS,
   parseClaims,
+  RESOURCE_SCOPES,
   type ReplayCache,
+  type ResourceMap,
   requireClaims,
   TokenError,
   verifyJwsWithKeySet,
@@ -214,5 +219,28 @@ export class OktaGrantVerifier {
     checkTimes(claims, t, maxLifetimeSeconds);
     replay.use(claims.jti, claims.exp as number, t);
     return { sub: claims.sub, act: agentClientId, aud: audience, scope, ticketId, jti: claims.jti };
+  }
+}
+
+/**
+ * Okta's single audience behind the dev issuer's resource names. `get` answers only for
+ * names the dev issuer also has, and only with the one verifier, so `runWithGrant` is
+ * unchanged. What keeps a `runbooks:read` grant out of `lookup_user` is the scope check.
+ */
+export class OktaResources implements ResourceMap {
+  private readonly verifier: OktaGrantVerifier;
+
+  constructor(verifier: OktaGrantVerifier) {
+    this.verifier = verifier;
+  }
+
+  get(resource: string): OktaGrantVerifier {
+    if (!Object.hasOwn(RESOURCE_SCOPES, resource)) throw new TokenError("unknown resource");
+    return this.verifier;
+  }
+
+  /** Every scope the authorization server must offer, one per tool. */
+  static scopes(): string[] {
+    return Object.values(RESOURCE_SCOPES).flat();
   }
 }

@@ -196,10 +196,13 @@ Re-checked against Okta's docs on 2026-11-27. "To confirm" means the docs don't 
   - whether a Web app can require PKCE
   - free-plan caps on users and authorization servers
 - **Built, key-free** (`web/src/okta.ts`, `OktaSubjectVerifier` in `web/src/identity.ts`, `web/test/okta.test.ts`): RS256 next to ES256, a JWKS key set that refetches at most once a minute for an unknown `kid`, and verifiers for Okta sign-in tokens and exchanged grants. They run the token attack list against Okta-shaped tokens signed with keys generated at test time. Nothing is wired to the site yet.
-- **Open decisions (Skylar):**
-  - **The dev-issuer rule versus tier 2.** `DevIssuer` refuses to start while a real issuer is configured (a hard rule in `CLAUDE.md`). Tier 2 (dev issuer) and tier 3 (Okta) share one Worker, so the rule needs re-scoping, for example per route or per session, before tier 3 is wired.
-  - **One audience or three** (above).
-  - **Which personas go into Okta,** and who is the `directory-admins` persona. (2026-11-27, Skylar: the tenant is shared with `identity-lifecycle-agent` (Savory Air), and the helpdesk personas will change to line up with that project.) Today three emails mean different people in the two projects: Rosa Delgado (IT approver here, warehouse director there), Morgan Hale and Omar Haddad. The tenant may be capped at ten active users across both demos. The persona set must be agreed before anything is seeded.
+- **Decided 2026-11-27 (Skylar):**
+  - **One issuer per session.** A session's issuer (`dev` or `okta`) is fixed when it's created and stored with it. Tier 2 sessions use the dev issuer, tier 3 sessions Okta, never both in one session. The dev issuer is never built for an Okta session, and the gate refuses an approver whose sign-in came from a different issuer than the requester's. This replaces "the dev issuer refuses to start while a real issuer is configured" for the Worker, where both tiers share one deployment. The Python CLI keeps the process-wide rule. Until Okta sign-in is wired, an Okta session can't be created or opened.
+  - **One audience.** One custom authorization server, `savory-air-helpdesk`, audience `api://savory-air-helpdesk`, offering all six tool scopes. `OktaResources` maps the dev issuer's three resource names onto it, so the tool code is unchanged. Resources are kept apart by scope alone: a grant carries exactly the one scope its tool needs, and a test presents every tool's grant at every other tool.
+  - **The Okta subset:** Jamie Rivera (requester); Casey Nguyen and Theo Park (approvers, `it-support`); Morgan Hale (Jamie's manager and the `directory-admins` persona, an account shared with the lifecycle demo). Three new accounts. Details and the seat count: `docs/savory-air-move.md`, "Okta: the shared subset".
+- **Built, key-free (2026-11-27):** the issuer kind on sessions and in the Durable Object (`issuerKind`, `web/src/identity.ts`), the gate's same-issuer check, and `OktaResources` (`web/src/okta.ts`).
+- **Next, after the "to confirm" items are checked in the console:** the tier 3 sign-in route (Authorization Code with PKCE), the token exchange client, an Okta `SignIn`, and the gate's mixed-issuer test (no Okta `SignIn` can be built yet, so that check has no test until then).
+- **Still open:** where `directory-admins` membership lives for the helpdesk. It isn't in `directory.json`; the admin's edit route isn't built.
 
 ## I6 notes: MCP
 
@@ -210,7 +213,7 @@ The [MCP authorization spec](https://modelcontextprotocol.io/specification/2026-
 - Tokens, receipts and signing keys never appear in code, logs, commits, PRs, prompts or tool results. Log `jti`, never the token.
 - The dev issuer's key exists only in memory. Tests generate their own keys.
 - Claude Code never signs in as a user or an operator against a real issuer, and never answers the write gate.
-- The dev issuer refuses to start if a real issuer is configured.
+- The dev issuer refuses to start if a real issuer is configured. (2026-11-27: in the Worker, one issuer per session instead; see the I5 decisions.)
 
 ## Still out of scope
 

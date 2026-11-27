@@ -15,6 +15,7 @@ import {
   b64urlEncode,
   DEV_ISSUER,
   DevIssuer,
+  issuerKind,
   type KeyPair,
   Principal,
   SUBJECT_TOKEN_SECONDS,
@@ -300,4 +301,39 @@ test("base64url: canonical round trip, strict decoding", () => {
     // "AB" decodes to one byte with stray low bits set: non-canonical.
     assert.throws(() => b64urlDecode(bad), TokenError, bad);
   }
+});
+
+// ---------------------------------------------------------------- one issuer per session
+
+test("a session's issuer kind is dev or okta; absent means dev; anything else is refused", () => {
+  assert.equal(issuerKind(undefined), "dev");
+  assert.equal(issuerKind("dev"), "dev");
+  assert.equal(issuerKind("okta"), "okta");
+  for (const bad of [null, "", "Okta", "DEV", " dev", "none", 1, {}, ["dev"]]) {
+    assert.throws(() => issuerKind(bad), TypeError, JSON.stringify(bad));
+  }
+});
+
+test("an Okta session refuses to open, so no dev issuer is ever built for it", async () => {
+  const { Session } = await import("../src/session.ts");
+  const { MemoryStore } = await import("../src/memory.ts");
+  const { FakeClient } = await import("./fakes.ts");
+  let minted = 0;
+  const issuer = new DevIssuer();
+  const original = issuer.signIn.bind(issuer);
+  issuer.signIn = async (email: string) => {
+    minted++;
+    return original(email);
+  };
+  await assert.rejects(
+    Session.open({
+      client: new FakeClient([]),
+      store: new MemoryStore(),
+      retriever: { search: () => [] } as never,
+      issuerKind: "okta",
+      issuer,
+    }),
+    /not wired yet/,
+  );
+  assert.equal(minted, 0);
 });

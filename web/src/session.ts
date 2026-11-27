@@ -33,7 +33,7 @@ import {
 import type { RawDirectory } from "./data.ts";
 import { Directory } from "./directory.ts";
 import { ApprovedBy, EMAIL_PATTERN, Gate, type Outcome, type Proposal } from "./governance.ts";
-import { DevIssuer, type SignIn } from "./identity.ts";
+import { DEV_ISSUER, DevIssuer, type IssuerKind, type SignIn } from "./identity.ts";
 import { pyLen } from "./pycompat.ts";
 import { display, type EscalationRecord, type Retriever } from "./tools.ts";
 
@@ -105,6 +105,11 @@ export interface SessionOptions {
   now?: () => number;
   approvalTimeoutMs?: number;
   minReviewMs?: number;
+  /**
+   * The issuer this session trusts, fixed at creation (identity phase I5). Only "dev" runs
+   * today; an Okta session refuses to open until its sign-in is wired.
+   */
+  issuerKind?: IssuerKind;
   /** Mints each run's requester token (identity phase I1). One per session if absent. */
   issuer?: DevIssuer;
   /**
@@ -180,6 +185,7 @@ export class Session {
       | "store"
       | "retriever"
       | "issuer"
+      | "issuerKind"
       | "operator"
       | "operators"
       | "modelOptions"
@@ -197,6 +203,9 @@ export class Session {
   active: Promise<void> = Promise.resolve();
 
   private constructor(options: SessionOptions, directory: Directory) {
+    if ((options.issuerKind ?? "dev") !== "dev") {
+      throw new Error("Okta sessions are not wired yet; this session can't open");
+    }
     this.opts = {
       clock: () => new Date(),
       now: () => performance.now(),
@@ -271,6 +280,7 @@ export class Session {
       // identity from a stored email.
       this.issuer ??= this.opts.issuer ?? new DevIssuer();
       const signIn = await this.issuer.signIn(run.requester);
+      if (signIn.principal.issuer !== DEV_ISSUER) throw new Error("sign-in from the wrong issuer");
       const pool = new Map<string, SignIn>();
       for (const email of this.opts.operators ?? []) {
         pool.set(email, await this.issuer.signIn(email));

@@ -484,8 +484,21 @@ export class GrantVerifier {
   }
 }
 
+/** Checks a delegated token for one call: exactly `scope`, bound to `ticketId`. */
+export interface ResourceVerifier {
+  verify(token: unknown, scope: string, ticketId: string): Promise<Grant>;
+}
+
+/**
+ * Where a tool's grant is checked, by resource name (`TOOL_GRANTS`). The dev issuer has a
+ * server per resource; Okta has one audience for all of them (`OktaResources`).
+ */
+export interface ResourceMap {
+  get(resource: string): ResourceVerifier;
+}
+
 /** The resource servers' verifiers, sharing one replay cache. */
-export class Resources {
+export class Resources implements ResourceMap {
   private readonly verifiers: ReadonlyMap<string, GrantVerifier>;
 
   constructor(verifiers: GrantVerifier[]) {
@@ -558,6 +571,23 @@ export class SignIn {
   toJSON() {
     return SignIn.is(this) ? this.principal.toJSON() : {};
   }
+}
+
+// ---------------------------------------------------------------- issuer per session
+
+/**
+ * Which issuer a session trusts, fixed when the session is created (decided 2026-11-27,
+ * Skylar): tier 2 sessions use the dev issuer, tier 3 sessions Okta, never both. The dev
+ * issuer is never built for an Okta session, and the gate refuses an approver from a
+ * different issuer than the requester's.
+ */
+export type IssuerKind = "dev" | "okta";
+
+/** A stored or requested kind. Absent means a session from before the field: dev. */
+export function issuerKind(value: unknown): IssuerKind {
+  if (value === undefined) return "dev";
+  if (value === "dev" || value === "okta") return value;
+  throw new TypeError("issuer kind must be dev or okta");
 }
 
 // ---------------------------------------------------------------- dev issuer

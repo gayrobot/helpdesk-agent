@@ -26,7 +26,7 @@ import {
   SideSignIns,
 } from "../demo.ts";
 import { Directory } from "../directory.ts";
-import { DevIssuer } from "../identity.ts";
+import { DevIssuer, type IssuerKind, issuerKind } from "../identity.ts";
 import { Session, type SessionStore, type StoredRun } from "../session.ts";
 import type { EscalationRecord } from "../tools.ts";
 import { BUDGET_NAME } from "./budget-object.ts";
@@ -128,10 +128,15 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
     private alarmSetAt = 0;
     private armedForRun = false;
 
-    /** Called once by the Worker when it creates the session. */
-    async init(hash: string): Promise<boolean> {
+    /**
+     * Called once by the Worker when it creates the session. The issuer kind is fixed
+     * here and never changes (identity phase I5); only "dev" sessions open today.
+     */
+    async init(hash: string, kind: IssuerKind = "dev"): Promise<boolean> {
+      const checked = issuerKind(kind);
+      if (checked !== "dev") return false; // Okta sign-in isn't wired yet: refuse to create
       if ((await this.ctx.storage.get("token_hash")) !== undefined) return false;
-      await this.ctx.storage.put("token_hash", hash);
+      await this.ctx.storage.put({ token_hash: hash, issuer_kind: checked });
       await this.touch(true);
       return true;
     }
@@ -164,23 +169,13 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
       if (!this.session) {
         // One issuer per session, its key in memory only: both sides' sign-ins and every
         // run's tokens come from it, and none survive a restart.
-        const issuer = new DevIssuer();
-        this.signIns = new SideSignIns(issuer);
-        const opened = Session.open({
-          client: makeClient(),
-          store: new DurableStore(this.ctx.storage),
-          retriever: bundledAclRetriever(),
-          issuer,
-          operators: DEMO_HELPDESK,
-          modelOptions: DEMO_MODEL_OPTIONS,
-          maxToolTurns: DEMO_MAX_TOOL_TURNS,
-          ...sessionTimings,
-        }).then(async (session) => {
-          for (const lost of await session.unsettled()) {
-            await this.budget().settle(lost.reservationId, lost.costUsd ?? Number.NaN);
-            await session.markSettled(lost.runId);
-          }
-          return session;
+        const opened = this.ctx.storage.get("issuer_kind").then((stored) => {
+          // A stored kind other than dev fails here, before any dev issuer exists.
+          const kind = issuerKind(stored);
+          if (kind !== "dev") throw new Error("Okta sessions are not wired yet");
+          const issuer = new DevIssuer();
+          this.signIns = new SideSignIns(issuer);
+          return this.openDevSession(issuer, kind);
         });
         this.session = opened;
         opened.catch(() => {
@@ -188,6 +183,26 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
         });
       }
       return this.session;
+    }
+
+    private openDevSession(issuer: DevIssuer, kind: IssuerKind): Promise<Session> {
+      return Session.open({
+        issuerKind: kind,
+        client: makeClient(),
+        store: new DurableStore(this.ctx.storage),
+        retriever: bundledAclRetriever(),
+        issuer,
+        operators: DEMO_HELPDESK,
+        modelOptions: DEMO_MODEL_OPTIONS,
+        maxToolTurns: DEMO_MAX_TOOL_TURNS,
+        ...sessionTimings,
+      }).then(async (session) => {
+        for (const lost of await session.unsettled()) {
+          await this.budget().settle(lost.reservationId, lost.costUsd ?? Number.NaN);
+          await session.markSettled(lost.runId);
+        }
+        return session;
+      });
     }
 
     /** Check on a running ticket, or delete everything once the session has gone unused. */
