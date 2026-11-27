@@ -28,14 +28,14 @@ test("the reservation covers the worst case at Haiku's prices", () => {
 test("only search_runbooks is offered, on Haiku, short, without fallbacks", async () => {
   const fake = new FakeClient([
     message([toolUse("search_runbooks", { query: "set up vpn" })], "tool_use"),
-    message([text("Install Larkspur Connect.\nSource: vpn-setup")], "end_turn", {
+    message([text("Install Savory Connect.\nSource: vpn-setup")], "end_turn", {
       model: ASK_MODEL,
     }),
   ]);
   const result = await askRunbooks("How do I set up the VPN?", { client: fake, retriever, issuer });
   assert.equal(result.status, "answered");
   assert.equal(result.source, "vpn-setup");
-  assert.equal(result.answer, "Install Larkspur Connect.");
+  assert.equal(result.answer, "Install Savory Connect.");
   assert.deepEqual(result.searches, ["set up vpn"]);
   const req = fake.requests[0] as unknown as Record<string, unknown>;
   assert.deepEqual(

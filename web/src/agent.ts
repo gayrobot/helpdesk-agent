@@ -32,7 +32,7 @@ export const MAX_TOOL_TURNS = 8;
 
 // Generated from helpdesk_agent.agent.SYSTEM_PROMPT; test/parity.test.ts checks the bytes.
 export const SYSTEM_PROMPT = [
-  "You are the IT helpdesk assistant for Larkspur Labs. You handle one ticket at a time for employees, using only the tools provided.",
+  "You are the IT helpdesk assistant for Savory Air. You handle one ticket at a time for employees, using only the tools provided.",
   "",
   "How you work:",
   "- Look things up before acting. Confirm the account exists and check its status, groups and MFA state with lookup_user, and devices with list_devices.",

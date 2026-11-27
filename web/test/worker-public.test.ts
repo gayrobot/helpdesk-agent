@@ -115,7 +115,7 @@ test("ts_t2_public_sessions_need_turnstile", async () => {
 test("ts_t2_public_full_flow_and_the_left_side_cannot_approve", async () => {
   const s = await session(); // 2nd
   await s.signIn("requester", "jamie@example.test");
-  await s.signIn("helpdesk", "rosa.delgado@example.test");
+  await s.signIn("helpdesk", "casey.nguyen@example.test");
   const started = await raw("POST", "/api/runs", s.as("requester"), { ticket: "reset my MFA" });
   assert.equal(started.status, 202, JSON.stringify(started.body)); // 1st ticket
   const runId = started.body.run_id as string;

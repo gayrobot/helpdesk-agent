@@ -160,7 +160,7 @@ def test_audit_failure_blocks_the_write(directory, tmp_path):
         "ADMINS ",
         "domain-admins",
         "okta-super-admins",
-        "aws-prod-admins",
+        "ecommerce-prod-admins",
         "finance-approvers",
         "admins\u200b",
         "\uff21\uff44\uff4d\uff49\uff4e\uff53",
@@ -197,13 +197,13 @@ def test_unknown_group_is_an_error_not_a_create(make_gate, directory):
 
 def test_already_member_is_an_error_without_prompt(make_gate):
     approver = RecordingApprover(answer=True)
-    outcome = make_gate(approver).execute("add_to_group", {"email": JAMIE, "group": "engineering"})
+    outcome = make_gate(approver).execute("add_to_group", {"email": JAMIE, "group": "ecommerce"})
     assert outcome.decision is Decision.TOOL_ERROR
     assert approver.proposals == []
 
 
 @pytest.mark.parametrize(
-    "email", ["sam.whitfield@example.test", "rosa.delgado@example.test", "grace.lin@example.test"]
+    "email", ["sam.whitfield@example.test", "casey.nguyen@example.test", "grace.lin@example.test"]
 )
 def test_mfa_reset_refused_for_privileged_accounts(make_gate, directory, email):
     approver = RecordingApprover(answer=True)

@@ -1,6 +1,6 @@
 # VPN troubleshooting
 
-Fixes for the most common Larkspur Connect problems. Synthetic runbook for helpdesk-agent.
+Fixes for the most common Savory Connect problems. Synthetic runbook for helpdesk-agent.
 
 ## "Portal unreachable" or the client hangs on connecting
 

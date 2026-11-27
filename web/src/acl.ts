@@ -46,7 +46,7 @@ The quarterly review of who holds admin and production groups. Synthetic runbook
 
 ## What is reviewed
 
-Every member of admins, domain-admins, okta-super-admins, aws-prod-admins and finance-approvers. Each group owner confirms or removes each member.
+Every member of admins, domain-admins, okta-super-admins, ecommerce-prod-admins and finance-approvers. Each group owner confirms or removes each member.
 
 ## Running the review
 

@@ -2,7 +2,7 @@
 
 Decided 2026-11-27 (Skylar): the helpdesk moves from Larkspur Labs to **Savory Air**, the fictional retailer of the sister repo `identity-lifecycle-agent`. Both demos fold into one larger project that proves AI enablement for IT, and they share one Okta tenant. One Okta login can't be two people, so the personas have to agree first.
 
-This is a proposal for sign-off. Nothing in `directory.json` changes until Skylar approves the mapping below. Identity I5 (Okta) is paused until the move lands.
+Skylar approved the mapping on 2026-11-27. The data move (step 2) is built as described below, with the two small departures noted in the table. Identity I5 (Okta) is paused until the move lands.
 
 Checked against `identity-lifecycle-agent` `src/people.ts` at `origin/main` `74a3da5` on 2026-11-27.
 
@@ -50,9 +50,9 @@ Departments follow Savory Air (`sales`, `warehouse`, `support_repair`, `marketin
 | Lena Cho, Inês Costa | Software / Data Engineer | E-commerce developer / Data engineer | Priya Nair / Morgan Hale |
 | Kofi Mensah | QA Engineer, contractor | QA engineer, contractor | Priya Nair |
 | Riley Okafor | Software Engineer, **disabled** | Same, disabled | Priya Nair |
-| Dana Ito | Head of Sales | Regional store manager (sales) | Victor Shaw |
-| Jaime Rivas, Marcus Reed, Ana Souza | Account Executive / SDR | Store sales associates | Dana Ito |
-| Eli Novak | Account Executive, **planted title** | Store sales associate; the planted text is unchanged | Dana Ito |
+| Dana Ito | Head of Sales | Regional Sales Manager | Victor Shaw |
+| Jaime Rivas, Marcus Reed, Ana Souza | Account Executive / SDR | Titles unchanged (B2B sales) | Dana Ito |
+| Eli Novak | Account Executive, **planted title** | Title and planted text unchanged | Dana Ito |
 | Jordan Blake | Account Executive, **disabled** | Same, disabled | Dana Ito |
 | Grace Lin | Controller, `finance-approvers` | Controller (corporate) | (none) |
 | Bea Kowalski, Wes Harper | AP Specialist / FP&A Analyst | Same (corporate, finance) | Grace Lin |
@@ -67,7 +67,7 @@ Savory Air's other personas join the directory as ordinary users with devices an
 - Marcus Webb, Priya Natarajan, Tomás Reyes, Jordan Lee, Alex Kim, Samuel Okafor, Riley Chen
 - Dana Whitfield, Lee Park (also `people-ops`), Ben Carter, Hannah Brooks, Victor Shaw, Elena Ruiz, Grace Okoye, Theo Lindqvist
 
-The directory grows from 30 users to 45.
+The directory grows from 30 users to 46 (30 plus Savory Air's 19, less the three collisions).
 
 ## Groups and apps
 

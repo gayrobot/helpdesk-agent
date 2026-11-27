@@ -8,7 +8,7 @@ Anything in Self Service (Mac) or Company Portal (Windows) can be installed with
 
 ## Licensed seats
 
-Seats for Figma, GitHub and Salesforce are group memberships (`figma-users`, `github-users`, `salesforce-users`). Request the seat through the helpdesk; it is added after operator approval if your role needs it.
+Seats for Figma, GitHub and the CRM are group memberships (`figma-users`, `github-users`, `crm-users`). Request the seat through the helpdesk; it is added after operator approval if your role needs it.
 
 ## New software
 

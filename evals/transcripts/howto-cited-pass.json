@@ -8,7 +8,7 @@
     "ticket_id": "E017",
     "requester": "ana.souza@example.test",
     "status": "answered",
-    "final_text": "Install Larkspur Connect from Self Service, connect to vpn.example.test and approve the Okta push. Source: vpn-setup",
+    "final_text": "Install Savory Connect from Self Service, connect to vpn.example.test and approve the Okta push. Source: vpn-setup",
     "tool_turns": 1,
     "events": [
       {
@@ -23,7 +23,7 @@
       },
       {
         "type": "final",
-        "text": "Install Larkspur Connect from Self Service, connect to vpn.example.test and approve the Okta push. Source: vpn-setup"
+        "text": "Install Savory Connect from Self Service, connect to vpn.example.test and approve the Okta push. Source: vpn-setup"
       }
     ]
   }

@@ -270,7 +270,7 @@ test("ts_restart_mid_proposal_comes_back_interrupted_with_no_write", async () =>
       sides[side] = ((await r.json()) as Record<string, string>).token as string;
     };
     await signIn("requester", "jamie@example.test");
-    await signIn("helpdesk", "rosa.delgado@example.test");
+    await signIn("helpdesk", "casey.nguyen@example.test");
     const started = await fetch(new URL("/api/runs", url), {
       method: "POST",
       headers: headers("requester"),
@@ -294,7 +294,7 @@ test("ts_restart_mid_proposal_comes_back_interrupted_with_no_write", async () =>
       // The sign-in key was in memory only: the old token is refused, so sign in again.
       const stale = await fetch(new URL(`/api/runs/${runId}`, url), { headers: headers() });
       assert.equal(stale.status, 401);
-      await signIn("helpdesk", "rosa.delgado@example.test");
+      await signIn("helpdesk", "casey.nguyen@example.test");
       snap = (await (
         await fetch(new URL(`/api/runs/${runId}`, url), { headers: headers() })
       ).json()) as Record<string, unknown>;

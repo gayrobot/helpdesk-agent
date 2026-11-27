@@ -84,7 +84,7 @@ test("each issuer has its own key: another issuer's token is refused", async () 
 
 test("the dev issuer refuses to start alongside a real issuer", () => {
   assert.throws(
-    () => new DevIssuer({ realIssuer: "https://larkspur.okta.test" }),
+    () => new DevIssuer({ realIssuer: "https://savory-air.okta.test" }),
     /refuses to start/,
   );
 });
@@ -189,7 +189,7 @@ test("claim attacks are refused", async () => {
   const { verifier, make } = await setup();
   const cases: [string, Record<string, unknown>][] = [
     ["wrong issuer", claims({ iss: "https://evil.example" })],
-    ["wrong audience", claims({ aud: "larkspur-directory" })],
+    ["wrong audience", claims({ aud: "savory-air-directory" })],
     ["audience as an array", claims({ aud: [AGENT_AUDIENCE] })],
     ["expired", claims({ iat: NOW - 1000, exp: NOW - 100 })],
     ["issued in the future", claims({ iat: NOW + 600, exp: NOW + 1500 })],

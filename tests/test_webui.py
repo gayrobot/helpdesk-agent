@@ -447,7 +447,7 @@ def test_double_click_cannot_approve_the_next_write(make_server_with, audit):
             [
                 tool_use("reset_mfa", {"email": "jamie@example.test"}, "toolu_a"),
                 tool_use(
-                    "add_to_group", {"email": "jamie@example.test", "group": "design"}, "toolu_b"
+                    "add_to_group", {"email": "jamie@example.test", "group": "creative"}, "toolu_b"
                 ),
             ],
             "tool_use",

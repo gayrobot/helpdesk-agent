@@ -42,7 +42,7 @@ Skylar, by hand. Nothing uses it until Phase 8 (identity phase I5), but it's cre
 
 - [x] **Create an Okta Integrator Free Plan org** at developer.okta.com. Use it only for this project. (Done by 2026-11-25.)
 - [ ] **Sign in with phishing-resistant MFA** on your own admin account (a passkey or WebAuthn key).
-- [ ] **Put nothing real in it.** Only the synthetic Larkspur users and groups, loaded later by a script from `directory.json`. No real people, no connections to other orgs, no production apps.
+- [ ] **Put nothing real in it.** Only synthetic Savory Air personas, loaded later by a script from `directory.json`. No real people, no connections to other orgs, no production apps.
 - [ ] **Store the org URL in 1Password** (e.g. a new `HelpDeskAgent-Okta` item). Client IDs and the agent's private key go in the same item later and are referenced from `.env.tpl`; never paste them into a terminal, chat or file.
 - [ ] **Note:** `example.test` addresses can't receive activation email, so the synthetic users' passwords will be set by you, through the admin console or the seeding script.
 

@@ -12,7 +12,7 @@ import { TICKETS } from "./shared.ts";
 
 const MORGAN = "morgan.hale@example.test"; // Jamie's manager
 const PRIYA = "priya.nair@example.test"; // Lena's manager, not Jamie's
-const ROSA = "rosa.delgado@example.test"; // it-support
+const CASEY = "casey.nguyen@example.test"; // it-support
 const THEO = "theo.park@example.test"; // it-support
 const directory = Directory.load();
 const user = (email: string) => {
@@ -26,7 +26,7 @@ const user = (email: string) => {
 test("readView: self, direct manager and it-support see the full record; others the card", () => {
   assert.equal(readView(directory, JAMIE, user(JAMIE)), "full");
   assert.equal(readView(directory, MORGAN, user(JAMIE)), "full");
-  assert.equal(readView(directory, ROSA, user(JAMIE)), "full");
+  assert.equal(readView(directory, CASEY, user(JAMIE)), "full");
   assert.equal(readView(directory, PRIYA, user(JAMIE)), "card");
   assert.equal(readView(directory, JAMIE, user(MORGAN)), "card"); // not upward
   // Case and padding don't change who you are, and don't fake a relation either.
@@ -40,13 +40,13 @@ test("mayRequest: self and direct reports; it-support only for ordinary MFA rese
   assert.ok(mayRequest(directory, PRIYA, "reset_mfa", user(JAMIE))); // a stranger
   assert.ok(mayRequest(directory, JAMIE, "reset_mfa", user(MORGAN))); // not upward
   // The helpdesk role: MFA resets for active, non-privileged users only.
-  assert.equal(mayRequest(directory, ROSA, "reset_mfa", user(JAMIE)), null);
-  assert.ok(mayRequest(directory, ROSA, "add_to_group", user(JAMIE)));
-  assert.ok(mayRequest(directory, ROSA, "reset_mfa", user("grace.lin@example.test"))); // privileged
-  assert.ok(mayRequest(directory, ROSA, "reset_mfa", user("riley.okafor@example.test"))); // disabled
+  assert.equal(mayRequest(directory, CASEY, "reset_mfa", user(JAMIE)), null);
+  assert.ok(mayRequest(directory, CASEY, "add_to_group", user(JAMIE)));
+  assert.ok(mayRequest(directory, CASEY, "reset_mfa", user("grace.lin@example.test"))); // privileged
+  assert.ok(mayRequest(directory, CASEY, "reset_mfa", user("riley.okafor@example.test"))); // disabled
   // Another helpdesk member has authority over others: not an ordinary user.
-  assert.ok(mayRequest(directory, ROSA, "reset_mfa", user(THEO)));
-  assert.equal(mayRequest(directory, ROSA, "reset_mfa", user(ROSA)), null); // her own: self
+  assert.ok(mayRequest(directory, CASEY, "reset_mfa", user(THEO)));
+  assert.equal(mayRequest(directory, CASEY, "reset_mfa", user(CASEY)), null); // her own: self
 });
 
 test("the card shows name, department, title, manager and status, never groups, MFA or devices", () => {
@@ -90,7 +90,7 @@ test("a manager's write reaches the approver", async () => {
 
 test("the helpdesk role can ask for an ordinary MFA reset, not for anything else", async () => {
   const approver = new RecordingApprover(true);
-  const { gate, directory: d } = await makeGate({ approver: approver.approve, requester: ROSA });
+  const { gate, directory: d } = await makeGate({ approver: approver.approve, requester: CASEY });
   assert.equal((await gate.execute("reset_mfa", { email: JAMIE })).decision, "approved");
   assert.equal(d.findUser(JAMIE)?.mfa.enrolled, false);
   for (const [tool, args] of [
@@ -185,11 +185,17 @@ test("replaying the recorded TypeScript baseline: only the predicted decisions c
   // through the new gate with auto-deny. Writes for strangers (E044-E047) move from
   // denied_by_human to denied_by_policy; nothing else changes decision. E042 and E043
   // (managers) still reach the approver.
+  // The run was recorded at Larkspur Labs; it is translated into the Savory Air directory
+  // the same way the ticket set was (docs/savory-air-move.md).
+  const recorded = readFileSync(
+    new URL("../../evals/results/ts-2026-11-25T202914Z.json", import.meta.url),
+    "utf8",
+  );
   const run = JSON.parse(
-    readFileSync(
-      new URL("../../evals/results/ts-2026-11-25T202914Z.json", import.meta.url),
-      "utf8",
-    ),
+    recorded
+      .replaceAll("salesforce-users", "crm-users")
+      .replaceAll("aws-prod-admins", "ecommerce-prod-admins")
+      .replaceAll("omar.haddad@example.test", "wes.harper@example.test"),
   ) as {
     tickets: {
       ticket_id: string;

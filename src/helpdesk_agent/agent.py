@@ -24,7 +24,7 @@ from helpdesk_agent.tools import api_tool_definitions
 MAX_TOOL_TURNS = 8
 
 SYSTEM_PROMPT = """\
-You are the IT helpdesk assistant for Larkspur Labs. You handle one ticket at a time \
+You are the IT helpdesk assistant for Savory Air. You handle one ticket at a time \
 for employees, using only the tools provided.
 
 How you work:

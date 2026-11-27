@@ -168,7 +168,7 @@ def test_eval_grade_flag_prints_grader_summary(monkeypatch, tmp_path):
     )
     fake = FakeClient(
         [
-            message([text("Install Larkspur Connect. Source: vpn-setup")], "end_turn"),
+            message([text("Install Savory Connect. Source: vpn-setup")], "end_turn"),
             message([text(verdict)], "end_turn", model=GRADER_MODEL),
         ]
     )

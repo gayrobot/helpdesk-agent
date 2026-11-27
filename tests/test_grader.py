@@ -159,7 +159,7 @@ def test_api_error_is_ungraded_and_logged(tmp_path):
 def agent_answer():
     return [
         message([tool_use("search_runbooks", {"query": "set up VPN"})], "tool_use"),
-        message([text("Install Larkspur Connect. Source: vpn-setup")], "end_turn"),
+        message([text("Install Savory Connect. Source: vpn-setup")], "end_turn"),
     ]
 
 

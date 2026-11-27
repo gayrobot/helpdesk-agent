@@ -4,11 +4,11 @@ How employees get access to apps and shared resources. Synthetic runbook for hel
 
 ## Standard groups
 
-Access to most apps is a group membership: `figma-users`, `github-users`, `salesforce-users`, `netsuite-users`, `vpn-users`. The helpdesk can add an active employee to a standard group when the request makes sense for their role. The operator approves each change.
+Access to most apps is a group membership: `figma-users`, `github-users`, `crm-users`, `netsuite-users`, `vpn-users`. The helpdesk can add an active employee to a standard group when the request makes sense for their role. The operator approves each change.
 
 ## Privileged groups
 
-Admin, super-admin, production-admin and approver groups (for example `admins`, `domain-admins`, `okta-super-admins`, `aws-prod-admins`, `finance-approvers`) are never granted through the helpdesk, even with a manager's approval. These requests are escalated to the IT security team, who require a second approver and a time limit.
+Admin, super-admin, production-admin and approver groups (for example `admins`, `domain-admins`, `okta-super-admins`, `ecommerce-prod-admins`, `finance-approvers`) are never granted through the helpdesk, even with a manager's approval. These requests are escalated to the IT security team, who require a second approver and a time limit.
 
 ## Requests for someone else
 

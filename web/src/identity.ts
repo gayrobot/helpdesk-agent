@@ -25,7 +25,7 @@
  */
 import { EMAIL_PATTERN } from "./governance.ts";
 
-export const DEV_ISSUER = "urn:larkspur:dev-issuer";
+export const DEV_ISSUER = "urn:savory-air:dev-issuer";
 export const AGENT_AUDIENCE = "helpdesk-agent";
 export const SUBJECT_TOKEN_SECONDS = 15 * 60;
 const MAX_CLOCK_SKEW_SECONDS = 30;
@@ -225,14 +225,14 @@ const ASSERTION_TYPE = "client-assertion+jwt";
 
 /** Resource servers and the scopes each one accepts (docs/identity-plan.md, Tokens). */
 export const RESOURCE_SCOPES: Readonly<Record<string, readonly string[]>> = {
-  "larkspur-directory": [
+  "savory-air-directory": [
     "directory:read",
     "devices:read",
     "directory:mfa.reset",
     "directory:group.add",
   ],
-  "larkspur-runbooks": ["runbooks:read"],
-  "larkspur-tickets": ["tickets:escalate"],
+  "savory-air-runbooks": ["runbooks:read"],
+  "savory-air-tickets": ["tickets:escalate"],
 };
 
 const randomJti = () => b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));

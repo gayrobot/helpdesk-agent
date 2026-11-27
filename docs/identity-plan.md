@@ -57,7 +57,7 @@ All JWTs, asymmetric signatures only. A shared HMAC secret is ruled out: whoever
   "iss": "https://issuer.example.test",
   "sub": "jamie@example.test",
   "act": { "sub": "helpdesk-agent" },
-  "aud": "larkspur-directory",
+  "aud": "savory-air-directory",
   "scope": "directory:read",
   "ticket_id": "T-20261124-0001",
   "exp": "<now + 60s>",
@@ -69,12 +69,12 @@ All JWTs, asymmetric signatures only. A shared HMAC secret is ruled out: whoever
 
 | Tool | Scope | Audience | Needs a receipt |
 | --- | --- | --- | --- |
-| `lookup_user` | `directory:read` | `larkspur-directory` | no |
-| `list_devices` | `devices:read` | `larkspur-directory` | no |
-| `search_runbooks` | `runbooks:read` | `larkspur-runbooks` | no |
-| `reset_mfa` | `directory:mfa.reset` | `larkspur-directory` | yes |
-| `add_to_group` | `directory:group.add` | `larkspur-directory` | yes |
-| `escalate` | `tickets:escalate` | `larkspur-tickets` | no |
+| `lookup_user` | `directory:read` | `savory-air-directory` | no |
+| `list_devices` | `devices:read` | `savory-air-directory` | no |
+| `search_runbooks` | `runbooks:read` | `savory-air-runbooks` | no |
+| `reset_mfa` | `directory:mfa.reset` | `savory-air-directory` | yes |
+| `add_to_group` | `directory:group.add` | `savory-air-directory` | yes |
+| `escalate` | `tickets:escalate` | `savory-air-tickets` | no |
 
 Rules for the verifier: one allowlisted algorithm per issuer; `none` and algorithm swaps rejected; `iss`, `aud`, `sub`, `exp`, `iat` and `jti` all required; `act.sub` must be the agent; `ticket_id` must match the gate's; each `jti` is used once. No refresh tokens. A subject token is never accepted at a tool.
 
@@ -167,7 +167,7 @@ Signing and verifying need an asymmetric crypto library; the standard library ha
   - **helpdesk** is `it-support`: it approves writes and can ask the agent for MFA resets, so its scopes include `directory:mfa.reset`.
   - **admin** is a new privileged group, `directory-admins` (Okta, tier 3 only): it can also edit user records through a human-only route. That is not an agent tool, and no delegated token ever carries an edit scope.
 - **Decision 2 (approver group)** is settled: `it-support`.
-- **Helpdesk-filed resets** (2026-11-25): a reset an `it-support` persona asks for needs a *different* `it-support` persona to approve. The demo's helpdesk side switches between two (e.g. Rosa Delgado and Theo Park), and the self-approval refusal shows on screen.
+- **Helpdesk-filed resets** (2026-11-25): a reset an `it-support` persona asks for needs a *different* `it-support` persona to approve. The demo's helpdesk side switches between two (e.g. Casey Nguyen and Theo Park since the Savory Air move (Rosa Delgado and Theo Park before)), and the self-approval refusal shows on screen.
 
 Checked on 2026-11-24. Re-check against Okta's current docs before building.
 

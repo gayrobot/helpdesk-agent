@@ -84,7 +84,7 @@ test("test_eval_grade_flag_prints_grader_summary", async () => {
       reason: "ok",
     });
     const fake = new FakeClient([
-      message([text("Install Larkspur Connect. Source: vpn-setup")], "end_turn"),
+      message([text("Install Savory Connect. Source: vpn-setup")], "end_turn"),
       message([thinking(), text(verdict)], "end_turn", { model: GRADER_MODEL }),
     ]);
     const { out, text: shown } = capture();
