@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { TOOL_GRANTS, toolGrant } from "../src/delegation.ts";
 import {
   b64urlEncode,
+  DevIssuer,
   type Key,
   type KeyPair,
   OktaSubjectVerifier,
@@ -375,4 +376,14 @@ test("one Okta audience serves every tool; scopes alone keep the resources apart
   }
   assert.throws(() => resources.get("api://savory-air-helpdesk"), TokenError, "not a resource");
   assert.throws(() => resources.get("__proto__"), TokenError);
+});
+
+// ---------------------------------------------------------------- one issuer per session
+
+test("a dev-issuer session never accepts an Okta sign-in, nor Okta a dev one", async () => {
+  const { subject, sign, clock } = await setup();
+  const dev = new DevIssuer({ now: () => clock.t });
+  const okta = await sign(subjectClaims());
+  await rejects((await dev.verifier()).verify(okta), "Okta token at the dev issuer");
+  await rejects(subject.verify(await dev.mint(JAMIE)), "dev token at the Okta verifier");
 });

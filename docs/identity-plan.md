@@ -188,7 +188,7 @@ Re-checked against Okta's docs on 2026-11-27. "To confirm" means the docs don't 
 - **The exchange** goes to the authorization server whose audience is requested, which must list the subject token's server under Trusted servers.
 - **Limits, kept rather than worked around:**
   - **No `ticket_id` claim** (claims come from Okta expressions, not request parameters, without an inline hook). Ticket binding stays in the harness. Reuse in another ticket is still refused, because the session's replay cache takes each `jti` once.
-  - **One audience per authorization server**, so the dev issuer's three resource audiences become three servers or one shared audience. Open decision.
+  - **One audience per authorization server**, so the dev issuer's three resource audiences become three servers or one shared audience. Decided 2026-11-27: one shared audience (below).
 - **To confirm:**
   - the shortest access token lifetime Okta allows (it may be minutes, not our 60 seconds)
   - whether `sub` is the login by default (we require a directory email)

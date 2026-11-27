@@ -2,7 +2,7 @@
 
 Decided 2026-11-27 (Skylar): the helpdesk moves from Larkspur Labs to **Savory Air**, the fictional retailer of the sister repo `identity-lifecycle-agent`. Both demos fold into one larger project that proves AI enablement for IT, and they share one Okta tenant. One Okta login can't be two people, so the personas have to agree first.
 
-Skylar approved the mapping on 2026-11-27. The data move (step 2) is built as described below, with the two small departures noted in the table. Identity I5 (Okta) is paused until the move lands.
+Skylar approved the mapping on 2026-11-27. The data move (step 2) is built as described below, with the two small departures noted in the table. The move landed and was deployed on 2026-11-27 (step 4), and I5 resumed the same day.
 
 Checked against `identity-lifecycle-agent` `src/people.ts` at `origin/main` `74a3da5` on 2026-11-27.
 
@@ -98,7 +98,7 @@ Each step is a PR unless marked otherwise. The live site isn't redeployed until 
 | 1 | This document, signed off | Skylar approves the mapping, or edits it |
 | 2 | **The data move**, in one PR, because CI ties the directory, tickets and parity fixtures together. It covers: `directory.json`, runbook names, the four Omar tickets, group renames in tickets, transcripts, Python and TypeScript tests, regenerated parity fixtures (`scripts/parity_fixtures.py`), the restricted runbooks' company name, the site pages and tier 2's personas | `uv run pytest` and `npm run check` pass. Every ticket still names a real directory user. No "Larkspur" outside history (`evals/results/`, dated plan entries). |
 | 3 | **Live evals** (Claude Code, via `op run`) | `--limit` first to measure cost, then full Python (the new baseline), then full TypeScript compared with `scripts/compare_results.py`, plus the retrieval eval. Results committed. Old Larkspur results stay as history. |
-| 4 | **Redeploy** `hddemo.damiano.dev` from the merged, green `main` | The site shows Savory Air. Sessions created before the deploy expire within 24 hours (alarm cleanup). |
+| 4 | **Redeploy** `hddemo.damiano.dev` from the merged, green `main` | The site shows Savory Air. Sessions created before the deploy expire within 24 hours (alarm cleanup). Done 2026-11-27 from `dc26b4e`: every page says Savory Air, health reports 46 users. |
 | 5 | **Resume I5** (PR #43 and onward): the Okta subset and seeding | See "Okta" below. Resumed 2026-11-27 after the redeploy; the subset is decided. |
 
 ## Results (2026-11-27)

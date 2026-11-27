@@ -314,7 +314,7 @@ test("a session's issuer kind is dev or okta; absent means dev; anything else is
   }
 });
 
-test("an Okta session refuses to open, so no dev issuer is ever built for it", async () => {
+test("an Okta session refuses to open and mints nothing", async () => {
   const { Session } = await import("../src/session.ts");
   const { MemoryStore } = await import("../src/memory.ts");
   const { FakeClient } = await import("./fakes.ts");

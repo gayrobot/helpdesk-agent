@@ -52,7 +52,7 @@ Claude Code never signs in to this org, never completes a device sign-in, and ne
 
 Skylar, by hand, in the Okta admin console, after the open decisions in `docs/identity-plan.md` (I5 notes) are settled. Everything here is OIDC / OAuth 2.0; there is no SAML.
 
-**Decided 2026-11-27 (Skylar):** one authorization server with one audience for every tool; four helpdesk personas, one of them shared with the lifecycle demo; each session fixed to one issuer (`docs/identity-plan.md`, I5 decisions). The rest of the tier 3 code (sign-in route, token exchange client) lands after the "to confirm" items below are checked.
+**Decided 2026-11-27 (Skylar):** one authorization server with one audience for every tool; four helpdesk personas, one of them shared with the lifecycle demo; each session fixed to one issuer (`docs/identity-plan.md`, I5 decisions). The rest of the tier 3 code (sign-in route, token exchange client) lands after the "to confirm" items in `docs/identity-plan.md` (I5 findings) are checked here.
 
 - [ ] **Custom authorization server, one for the helpdesk.** Create one named `savory-air-helpdesk` with audience `api://savory-air-helpdesk` (decided 2026-11-27: one audience for all tools; resources are kept apart by scope), named so the lifecycle demo's servers sit beside it in the shared tenant. Add the scopes `directory:read`, `devices:read`, `directory:mfa.reset`, `directory:group.add`, `runbooks:read`, `tickets:escalate`. Add an access policy: a new free org's server may have none. Set the shortest access token lifetime Okta allows, and write the number down here.
 - [ ] **Sign-in app** (tier 3): an OIDC app integration, Authorization Code with PKCE, sign-in redirect `https://hddemo.damiano.dev/auth/callback` (that route lands in a later PR). Assign only the synthetic users.
@@ -61,8 +61,8 @@ Skylar, by hand, in the Okta admin console, after the open decisions in `docs/id
   - `jamie@example.test`, Jamie Rivera: the requester.
   - `casey.nguyen@example.test` and `theo.park@example.test`: the two approvers, in an `it-support` group.
   - `morgan.hale@example.test`, Morgan Hale: Jamie's manager and the `directory-admins` persona. Morgan is also the lifecycle demo's IT director, so this is one account for both demos, not a second one.
-  - **Seats:** that's three new accounts plus Morgan. The lifecycle demo needs its seven leavers plus Morgan, so if the org is capped at ten active users (check under Settings → Account or Billing), the lifecycle demo can keep at most six leavers active at once. Write the cap you find here.
-- [ ] **Groups:** `it-support` (Casey, Theo) and `directory-admins` (Morgan). Group names match `directory.json` and `web/src/authz.ts`.
+  - **Seats:** that's three new accounts plus Morgan. The lifecycle demo needs its seven leavers plus Morgan, so if the org is capped at ten active users, the lifecycle demo can keep at most six leavers active at once. Write the cap you find here.
+- [ ] **Groups:** `it-support` (Casey, Theo) and `directory-admins` (Morgan). `it-support` matches `directory.json`; `directory-admins` exists only in `web/src/authz.ts` (an authority group) and in Okta, not in `directory.json`.
 - [ ] **1Password:** put the issuer URL, both client IDs, and the agent's key or secret in one item (for example `HelpDeskAgent-Okta` in `Nerd Shit`). Then add references to `.env.tpl` yourself (Claude Code doesn't open that file):
 
   ```
