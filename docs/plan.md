@@ -23,6 +23,8 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 
 The project is now a web app, not only a CLI. Order: see it work locally, rewrite it web-native, add identity, build the public site, deploy. The old Phase 6 (a static write-up page) moves to Phase 10. Agent identity is specified in [identity-plan.md](identity-plan.md), whose phases are numbered I1–I6.
 
+**Moving to Savory Air (decided 2026-11-27, Skylar):** the helpdesk moves from Larkspur Labs to Savory Air, the sister repo `identity-lifecycle-agent`'s fictional retailer, because the two demos fold into one project and share the Okta tenant. Identity I5 pauses until the move lands. Proposal, sequence and "done when" for each step: [savory-air-move.md](savory-air-move.md).
+
 **Before Phase 7 (Skylar):** create the Okta Integrator Free Plan org. See `docs/operator-checklist.md`. Nothing uses it until Phase 8 (I5), and it holds synthetic users only.
 
 ### Phase 6: local web UI
