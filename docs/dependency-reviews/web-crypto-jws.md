@@ -38,3 +38,5 @@ The cost is owning a small amount of security-sensitive code. That is handled wi
 ## When to revisit
 
 If Okta (I5) needs anything beyond a fixed ES256 or RS256 key, such as fetching and rotating keys from its JWKS endpoint, reconsider `jose` then, with its own review. RS256 would add one entry to the algorithm table (RSASSA-PKCS1-v1_5 with SHA-256 is in Web Crypto). Check what Okta signs with before choosing.
+
+**Revisited 2026-11-27 (I5): still no dependency.** Okta signs with RS256 and publishes its keys as a JWKS. RS256 is one more row in the algorithm table. The key set (`web/src/okta.ts`) is about 100 lines: one URL derived from the configured issuer, RSA keys of at least 2048 bits, selection by `kid`, and at most one refetch a minute. The algorithm still comes from configuration, never the token, and key-pointing headers are still refused. `jose` would replace that with a remote key set we'd configure the same way, so the trade is the same as before. Tests: a cross-check with `node:crypto` for RS256, plus key-type confusion both ways (an RSA key under ES256 and the reverse).
