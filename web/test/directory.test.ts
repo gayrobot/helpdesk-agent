@@ -9,8 +9,8 @@ const directory = () => Directory.load();
 
 test("test_loads_synthetic_company", () => {
   const d = directory();
-  assert.equal(d.company, "Larkspur Labs");
-  assert.ok(d.users.size >= 20 && d.users.size <= 40);
+  assert.equal(d.company, "Savory Air");
+  assert.ok(d.users.size >= 40 && d.users.size <= 60);
   for (const email of d.users.keys()) assert.ok(email.endsWith("@example.test"));
 });
 
@@ -58,7 +58,7 @@ for (const name of [
   " admins ",
   "Admins​",
   "domain-admins",
-  "aws-prod-admins",
+  "ecommerce-prod-admins",
   "finance-approvers",
   "okta-super-admins",
   "new-admin-group",

@@ -1,16 +1,16 @@
 {
-  "_comment": "Synthetic data for helpdesk-agent. Larkspur Labs and everyone in it are invented.",
-  "company": "Larkspur Labs",
+  "_comment": "Synthetic data for helpdesk-agent. Savory Air and everyone in it are invented (shared with identity-lifecycle-agent).",
+  "company": "Savory Air",
   "groups": [
     {
       "name": "all-staff",
       "privileged": false,
-      "description": "Everyone at Larkspur Labs"
+      "description": "Everyone at Savory Air"
     },
     {
-      "name": "engineering",
+      "name": "ecommerce",
       "privileged": false,
-      "description": "Engineering department"
+      "description": "E-commerce team (in IT)"
     },
     {
       "name": "sales",
@@ -33,9 +33,9 @@
       "description": "IT support team"
     },
     {
-      "name": "design",
+      "name": "creative",
       "privileged": false,
-      "description": "Design team"
+      "description": "Creative team (in marketing)"
     },
     {
       "name": "marketing",
@@ -46,6 +46,21 @@
       "name": "legal",
       "privileged": false,
       "description": "Legal team"
+    },
+    {
+      "name": "warehouse",
+      "privileged": false,
+      "description": "Warehouse and distribution"
+    },
+    {
+      "name": "support-repair",
+      "privileged": false,
+      "description": "Support and repair"
+    },
+    {
+      "name": "corporate",
+      "privileged": false,
+      "description": "Corporate functions"
     },
     {
       "name": "contractors",
@@ -68,14 +83,29 @@
       "description": "Figma editor seat"
     },
     {
-      "name": "salesforce-users",
+      "name": "crm-users",
       "privileged": false,
-      "description": "Salesforce user license"
+      "description": "CRM user license"
     },
     {
       "name": "netsuite-users",
       "privileged": false,
       "description": "NetSuite read/write access"
+    },
+    {
+      "name": "wms-users",
+      "privileged": false,
+      "description": "Warehouse system account"
+    },
+    {
+      "name": "ad-platform-users",
+      "privileged": false,
+      "description": "Ad platform seat"
+    },
+    {
+      "name": "parts-ordering-users",
+      "privileged": false,
+      "description": "Parts ordering account"
     },
     {
       "name": "admins",
@@ -93,9 +123,9 @@
       "description": "Identity provider super administrators"
     },
     {
-      "name": "aws-prod-admins",
+      "name": "ecommerce-prod-admins",
       "privileged": true,
-      "description": "Administrator access to production AWS"
+      "description": "Administrator access to the production e-commerce platform"
     },
     {
       "name": "finance-approvers",
@@ -125,9 +155,9 @@
       "description": "Design tool"
     },
     {
-      "name": "Salesforce",
-      "access_group": "salesforce-users",
-      "description": "CRM"
+      "name": "CRM",
+      "access_group": "crm-users",
+      "description": "Customer relationship management"
     },
     {
       "name": "NetSuite",
@@ -135,17 +165,32 @@
       "description": "ERP and accounting"
     },
     {
-      "name": "AWS Console (production)",
-      "access_group": "aws-prod-admins",
-      "description": "Production cloud console"
+      "name": "Warehouse system",
+      "access_group": "wms-users",
+      "description": "Inventory and fulfilment"
+    },
+    {
+      "name": "Ad platform",
+      "access_group": "ad-platform-users",
+      "description": "Paid media campaigns"
+    },
+    {
+      "name": "Parts ordering",
+      "access_group": "parts-ordering-users",
+      "description": "Repair parts from suppliers"
+    },
+    {
+      "name": "E-commerce platform (production)",
+      "access_group": "ecommerce-prod-admins",
+      "description": "Production online store administration"
     }
   ],
   "users": [
     {
       "email": "morgan.hale@example.test",
       "name": "Morgan Hale",
-      "department": "Engineering",
-      "title": "VP of Engineering",
+      "department": "IT",
+      "title": "IT director",
       "manager": null,
       "status": "active",
       "employment": "full_time",
@@ -156,17 +201,16 @@
       },
       "groups": [
         "all-staff",
-        "engineering",
-        "github-users",
         "vpn-users",
-        "aws-prod-admins"
+        "github-users",
+        "ecommerce-prod-admins"
       ]
     },
     {
       "email": "jamie@example.test",
       "name": "Jamie Rivera",
-      "department": "Engineering",
-      "title": "Software Engineer",
+      "department": "IT",
+      "title": "E-commerce Developer",
       "manager": "morgan.hale@example.test",
       "status": "active",
       "employment": "full_time",
@@ -177,7 +221,7 @@
       },
       "groups": [
         "all-staff",
-        "engineering",
+        "ecommerce",
         "github-users",
         "vpn-users"
       ]
@@ -198,14 +242,14 @@
       "groups": [
         "all-staff",
         "sales",
-        "salesforce-users"
+        "crm-users"
       ]
     },
     {
       "email": "priya.nair@example.test",
       "name": "Priya Nair",
-      "department": "Engineering",
-      "title": "Staff Engineer",
+      "department": "IT",
+      "title": "E-commerce Engineering Lead",
       "manager": "morgan.hale@example.test",
       "status": "active",
       "employment": "full_time",
@@ -216,7 +260,7 @@
       },
       "groups": [
         "all-staff",
-        "engineering",
+        "ecommerce",
         "github-users",
         "vpn-users"
       ]
@@ -224,8 +268,8 @@
     {
       "email": "tomas.berg@example.test",
       "name": "Tomás Berg",
-      "department": "Engineering",
-      "title": "Site Reliability Engineer",
+      "department": "IT",
+      "title": "E-commerce Platform Engineer",
       "manager": "morgan.hale@example.test",
       "status": "active",
       "employment": "full_time",
@@ -236,17 +280,17 @@
       },
       "groups": [
         "all-staff",
-        "engineering",
+        "ecommerce",
         "github-users",
         "vpn-users",
-        "aws-prod-admins"
+        "ecommerce-prod-admins"
       ]
     },
     {
       "email": "lena.cho@example.test",
       "name": "Lena Cho",
-      "department": "Engineering",
-      "title": "Software Engineer",
+      "department": "IT",
+      "title": "E-commerce Developer",
       "manager": "priya.nair@example.test",
       "status": "active",
       "employment": "full_time",
@@ -257,7 +301,7 @@
       },
       "groups": [
         "all-staff",
-        "engineering",
+        "ecommerce",
         "github-users",
         "vpn-users"
       ]
@@ -265,7 +309,7 @@
     {
       "email": "kofi.mensah@example.test",
       "name": "Kofi Mensah",
-      "department": "Engineering",
+      "department": "IT",
       "title": "QA Engineer",
       "manager": "priya.nair@example.test",
       "status": "active",
@@ -277,7 +321,7 @@
       },
       "groups": [
         "all-staff",
-        "engineering",
+        "ecommerce",
         "github-users",
         "vpn-users",
         "contractors"
@@ -287,8 +331,8 @@
       "email": "dana.ito@example.test",
       "name": "Dana Ito",
       "department": "Sales",
-      "title": "Head of Sales",
-      "manager": null,
+      "title": "Regional Sales Manager",
+      "manager": "victor.shaw@example.test",
       "status": "active",
       "employment": "full_time",
       "mfa": {
@@ -299,7 +343,7 @@
       "groups": [
         "all-staff",
         "sales",
-        "salesforce-users"
+        "crm-users"
       ]
     },
     {
@@ -318,7 +362,7 @@
       "groups": [
         "all-staff",
         "sales",
-        "salesforce-users"
+        "crm-users"
       ]
     },
     {
@@ -337,7 +381,7 @@
       "groups": [
         "all-staff",
         "sales",
-        "salesforce-users"
+        "crm-users"
       ]
     },
     {
@@ -356,13 +400,13 @@
       "groups": [
         "all-staff",
         "sales",
-        "salesforce-users"
+        "crm-users"
       ]
     },
     {
       "email": "grace.lin@example.test",
       "name": "Grace Lin",
-      "department": "Finance",
+      "department": "Corporate",
       "title": "Controller",
       "manager": null,
       "status": "active",
@@ -382,9 +426,9 @@
     {
       "email": "omar.haddad@example.test",
       "name": "Omar Haddad",
-      "department": "Finance",
-      "title": "Staff Accountant",
-      "manager": "grace.lin@example.test",
+      "department": "Marketing",
+      "title": "Marketing operations lead",
+      "manager": "hannah.brooks@example.test",
       "status": "active",
       "employment": "full_time",
       "mfa": {
@@ -394,14 +438,15 @@
       },
       "groups": [
         "all-staff",
-        "finance",
-        "netsuite-users"
+        "marketing",
+        "ad-platform-users",
+        "figma-users"
       ]
     },
     {
       "email": "bea.kowalski@example.test",
       "name": "Bea Kowalski",
-      "department": "Finance",
+      "department": "Corporate",
       "title": "AP Specialist",
       "manager": "grace.lin@example.test",
       "status": "active",
@@ -420,9 +465,9 @@
     {
       "email": "nora.quinn@example.test",
       "name": "Nora Quinn",
-      "department": "People Ops",
-      "title": "Head of People",
-      "manager": null,
+      "department": "Corporate",
+      "title": "People Partner",
+      "manager": "dana.whitfield@example.test",
       "status": "active",
       "employment": "full_time",
       "mfa": {
@@ -438,7 +483,7 @@
     {
       "email": "felix.adeyemi@example.test",
       "name": "Felix Adeyemi",
-      "department": "People Ops",
+      "department": "Corporate",
       "title": "Recruiter",
       "manager": "nora.quinn@example.test",
       "status": "active",
@@ -458,7 +503,7 @@
       "name": "Sam Whitfield",
       "department": "IT",
       "title": "IT Manager",
-      "manager": null,
+      "manager": "morgan.hale@example.test",
       "status": "active",
       "employment": "full_time",
       "mfa": {
@@ -479,9 +524,9 @@
     {
       "email": "rosa.delgado@example.test",
       "name": "Rosa Delgado",
-      "department": "IT",
-      "title": "IT Support Specialist",
-      "manager": "sam.whitfield@example.test",
+      "department": "Warehouse",
+      "title": "Director of operations",
+      "manager": null,
       "status": "active",
       "employment": "full_time",
       "mfa": {
@@ -491,10 +536,8 @@
       },
       "groups": [
         "all-staff",
-        "it-support",
-        "vpn-users",
-        "github-users",
-        "admins"
+        "warehouse",
+        "wms-users"
       ]
     },
     {
@@ -520,9 +563,9 @@
     {
       "email": "iris.vance@example.test",
       "name": "Iris Vance",
-      "department": "Design",
-      "title": "Design Lead",
-      "manager": null,
+      "department": "Marketing",
+      "title": "Creative Lead",
+      "manager": "hannah.brooks@example.test",
       "status": "active",
       "employment": "full_time",
       "mfa": {
@@ -532,14 +575,14 @@
       },
       "groups": [
         "all-staff",
-        "design",
+        "creative",
         "figma-users"
       ]
     },
     {
       "email": "hugo.martin@example.test",
       "name": "Hugo Martin",
-      "department": "Design",
+      "department": "Marketing",
       "title": "Product Designer",
       "manager": "iris.vance@example.test",
       "status": "active",
@@ -551,14 +594,14 @@
       },
       "groups": [
         "all-staff",
-        "design",
+        "creative",
         "figma-users"
       ]
     },
     {
       "email": "mei.tanaka@example.test",
       "name": "Mei Tanaka",
-      "department": "Design",
+      "department": "Marketing",
       "title": "Product Designer",
       "manager": "iris.vance@example.test",
       "status": "active",
@@ -570,7 +613,7 @@
       },
       "groups": [
         "all-staff",
-        "design",
+        "creative",
         "figma-users",
         "contractors"
       ]
@@ -579,8 +622,8 @@
       "email": "zara.ali@example.test",
       "name": "Zara Ali",
       "department": "Marketing",
-      "title": "Marketing Director",
-      "manager": null,
+      "title": "Brand Marketing Manager",
+      "manager": "hannah.brooks@example.test",
       "status": "active",
       "employment": "full_time",
       "mfa": {
@@ -616,7 +659,7 @@
     {
       "email": "ruth.ogden@example.test",
       "name": "Ruth Ogden",
-      "department": "Legal",
+      "department": "Corporate",
       "title": "General Counsel",
       "manager": null,
       "status": "active",
@@ -634,7 +677,7 @@
     {
       "email": "caleb.moss@example.test",
       "name": "Caleb Moss",
-      "department": "Legal",
+      "department": "Corporate",
       "title": "Paralegal",
       "manager": "ruth.ogden@example.test",
       "status": "active",
@@ -652,8 +695,8 @@
     {
       "email": "riley.okafor@example.test",
       "name": "Riley Okafor",
-      "department": "Engineering",
-      "title": "Software Engineer",
+      "department": "IT",
+      "title": "E-commerce Developer",
       "manager": "priya.nair@example.test",
       "status": "disabled",
       "employment": "full_time",
@@ -682,7 +725,7 @@
     {
       "email": "ines.costa@example.test",
       "name": "Inês Costa",
-      "department": "Engineering",
+      "department": "IT",
       "title": "Data Engineer",
       "manager": "morgan.hale@example.test",
       "status": "active",
@@ -694,7 +737,7 @@
       },
       "groups": [
         "all-staff",
-        "engineering",
+        "ecommerce",
         "github-users",
         "vpn-users"
       ]
@@ -702,7 +745,7 @@
     {
       "email": "wes.harper@example.test",
       "name": "Wes Harper",
-      "department": "Finance",
+      "department": "Corporate",
       "title": "FP&A Analyst",
       "manager": "grace.lin@example.test",
       "status": "active",
@@ -716,6 +759,313 @@
         "all-staff",
         "finance",
         "netsuite-users"
+      ]
+    },
+    {
+      "email": "marcus.webb@example.test",
+      "name": "Marcus Webb",
+      "department": "Warehouse",
+      "title": "Warehouse shift lead",
+      "manager": "ben.carter@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "warehouse",
+        "wms-users"
+      ]
+    },
+    {
+      "email": "priya.natarajan@example.test",
+      "name": "Priya Natarajan",
+      "department": "Marketing",
+      "title": "Paid media manager",
+      "manager": "hannah.brooks@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "marketing",
+        "ad-platform-users"
+      ]
+    },
+    {
+      "email": "tomas.reyes@example.test",
+      "name": "Tomás Reyes",
+      "department": "Sales",
+      "title": "Store sales associate",
+      "manager": "elena.ruiz@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "sales",
+        "crm-users"
+      ]
+    },
+    {
+      "email": "jordan.lee@example.test",
+      "name": "Jordan Lee",
+      "department": "Sales",
+      "title": "Senior sales associate",
+      "manager": "elena.ruiz@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "sales",
+        "crm-users"
+      ]
+    },
+    {
+      "email": "alex.kim@example.test",
+      "name": "Alex Kim",
+      "department": "Corporate",
+      "title": "Brand designer",
+      "manager": "dana.whitfield@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "corporate",
+        "figma-users"
+      ]
+    },
+    {
+      "email": "samuel.okafor@example.test",
+      "name": "Samuel Okafor",
+      "department": "Support and Repair",
+      "title": "Repair technician",
+      "manager": "theo.lindqvist@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "support-repair",
+        "parts-ordering-users"
+      ]
+    },
+    {
+      "email": "riley.chen@example.test",
+      "name": "Riley Chen",
+      "department": "IT",
+      "title": "Systems engineer",
+      "manager": "casey.nguyen@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "vpn-users",
+        "github-users"
+      ]
+    },
+    {
+      "email": "dana.whitfield@example.test",
+      "name": "Dana Whitfield",
+      "department": "Corporate",
+      "title": "VP, People Ops",
+      "manager": null,
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "webauthn",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "corporate",
+        "people-ops"
+      ]
+    },
+    {
+      "email": "lee.park@example.test",
+      "name": "Lee Park",
+      "department": "Corporate",
+      "title": "HRIS administrator",
+      "manager": "dana.whitfield@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "corporate",
+        "people-ops"
+      ]
+    },
+    {
+      "email": "casey.nguyen@example.test",
+      "name": "Casey Nguyen",
+      "department": "IT",
+      "title": "IT systems administrator",
+      "manager": "morgan.hale@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "webauthn",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "it-support",
+        "vpn-users",
+        "github-users",
+        "admins"
+      ]
+    },
+    {
+      "email": "ben.carter@example.test",
+      "name": "Ben Carter",
+      "department": "Warehouse",
+      "title": "Warehouse systems administrator",
+      "manager": "rosa.delgado@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "warehouse",
+        "wms-users"
+      ]
+    },
+    {
+      "email": "hannah.brooks@example.test",
+      "name": "Hannah Brooks",
+      "department": "Marketing",
+      "title": "Marketing director",
+      "manager": null,
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "marketing",
+        "ad-platform-users",
+        "figma-users"
+      ]
+    },
+    {
+      "email": "victor.shaw@example.test",
+      "name": "Victor Shaw",
+      "department": "Sales",
+      "title": "VP, Sales",
+      "manager": null,
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "webauthn",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "sales",
+        "crm-users"
+      ]
+    },
+    {
+      "email": "elena.ruiz@example.test",
+      "name": "Elena Ruiz",
+      "department": "Sales",
+      "title": "Sales operations manager",
+      "manager": "victor.shaw@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "sales",
+        "crm-users"
+      ]
+    },
+    {
+      "email": "grace.okoye@example.test",
+      "name": "Grace Okoye",
+      "department": "Support and Repair",
+      "title": "Director of support and repair",
+      "manager": null,
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "support-repair",
+        "parts-ordering-users"
+      ]
+    },
+    {
+      "email": "theo.lindqvist@example.test",
+      "name": "Theo Lindqvist",
+      "department": "Support and Repair",
+      "title": "Repair operations lead",
+      "manager": "grace.okoye@example.test",
+      "status": "active",
+      "employment": "full_time",
+      "mfa": {
+        "enrolled": true,
+        "method": "okta_verify",
+        "last_reset": null
+      },
+      "groups": [
+        "all-staff",
+        "support-repair",
+        "parts-ordering-users"
       ]
     }
   ],
@@ -1071,6 +1421,182 @@
       "compliant": true,
       "issues": [],
       "last_checkin": "2026-11-12"
+    },
+    {
+      "id": "DEV-0032",
+      "owner": "marcus.webb@example.test",
+      "type": "laptop",
+      "model": "Dell Latitude 5450",
+      "os": "Windows",
+      "os_version": "11 24H2",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-10"
+    },
+    {
+      "id": "DEV-0033",
+      "owner": "priya.natarajan@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-11"
+    },
+    {
+      "id": "DEV-0034",
+      "owner": "tomas.reyes@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-12"
+    },
+    {
+      "id": "DEV-0035",
+      "owner": "jordan.lee@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-10"
+    },
+    {
+      "id": "DEV-0036",
+      "owner": "alex.kim@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-11"
+    },
+    {
+      "id": "DEV-0037",
+      "owner": "samuel.okafor@example.test",
+      "type": "laptop",
+      "model": "Dell Latitude 5450",
+      "os": "Windows",
+      "os_version": "11 24H2",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-12"
+    },
+    {
+      "id": "DEV-0038",
+      "owner": "riley.chen@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-10"
+    },
+    {
+      "id": "DEV-0039",
+      "owner": "dana.whitfield@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-11"
+    },
+    {
+      "id": "DEV-0040",
+      "owner": "lee.park@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-12"
+    },
+    {
+      "id": "DEV-0041",
+      "owner": "casey.nguyen@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-10"
+    },
+    {
+      "id": "DEV-0042",
+      "owner": "ben.carter@example.test",
+      "type": "laptop",
+      "model": "Dell Latitude 5450",
+      "os": "Windows",
+      "os_version": "11 24H2",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-11"
+    },
+    {
+      "id": "DEV-0043",
+      "owner": "hannah.brooks@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-12"
+    },
+    {
+      "id": "DEV-0044",
+      "owner": "victor.shaw@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-10"
+    },
+    {
+      "id": "DEV-0045",
+      "owner": "elena.ruiz@example.test",
+      "type": "laptop",
+      "model": "MacBook Air 13",
+      "os": "macOS",
+      "os_version": "26.1",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-11"
+    },
+    {
+      "id": "DEV-0046",
+      "owner": "grace.okoye@example.test",
+      "type": "laptop",
+      "model": "Dell Latitude 5450",
+      "os": "Windows",
+      "os_version": "11 24H2",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-12"
+    },
+    {
+      "id": "DEV-0047",
+      "owner": "theo.lindqvist@example.test",
+      "type": "laptop",
+      "model": "Dell Latitude 5450",
+      "os": "Windows",
+      "os_version": "11 24H2",
+      "compliant": true,
+      "issues": [],
+      "last_checkin": "2026-11-10"
     }
   ]
 }

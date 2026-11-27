@@ -4,8 +4,8 @@ from helpdesk_agent.directory import Directory, is_mixed_script, normalize
 
 
 def test_loads_synthetic_company(directory):
-    assert directory.company == "Larkspur Labs"
-    assert 20 <= len(directory.users) <= 40
+    assert directory.company == "Savory Air"
+    assert 40 <= len(directory.users) <= 60
     assert all(email.endswith("@example.test") for email in directory.users)
 
 
@@ -58,7 +58,7 @@ def test_email_normalization_resolves_to_the_same_user(directory, raw):
         " admins ",
         "Admins\u200b",
         "domain-admins",
-        "aws-prod-admins",
+        "ecommerce-prod-admins",
         "finance-approvers",
         "okta-super-admins",
         "new-admin-group",

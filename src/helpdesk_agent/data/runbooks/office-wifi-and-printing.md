@@ -4,7 +4,7 @@ Synthetic runbook for helpdesk-agent.
 
 ## Wi-Fi networks
 
-`Larkspur` is the staff network: managed laptops connect automatically with a certificate. `Larkspur-Guest` is for visitors and personal phones; the password is posted at reception and changes monthly.
+`SavoryAir` is the staff network: managed laptops connect automatically with a certificate. `SavoryAir-Guest` is for visitors and personal phones; the password is posted at reception and changes monthly.
 
 ## Can't join the staff network
 

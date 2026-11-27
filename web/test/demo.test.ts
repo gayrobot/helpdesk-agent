@@ -30,9 +30,9 @@ const BASE = "http://127.0.0.1:8787";
 const TOKEN = "t".repeat(64);
 const JAMIE = "jamie@example.test";
 const PRIYA = "priya.nair@example.test";
-const ROSA = "rosa.delgado@example.test";
+const CASEY = "casey.nguyen@example.test";
 const THEO = "theo.park@example.test";
-const MORGAN = "morgan.hale@example.test"; // in aws-prod-admins (privileged)
+const MORGAN = "morgan.hale@example.test"; // in ecommerce-prod-admins (privileged)
 const DONE = message([text("Done.\nSource: RB-001")], "end_turn");
 const reset = (email: string) => message([toolUse("reset_mfa", { email }, "toolu_1")], "tool_use");
 const retriever = new BM25Retriever(loadRunbooks());
@@ -192,20 +192,20 @@ test("ts_t2_each_side_signs_in_only_as_its_own_personas", async () => {
   const lists = personas(Directory.load());
   assert.deepEqual(
     lists.helpdesk.map((p) => p.email),
-    [ROSA, THEO],
+    [CASEY, THEO],
   );
   assert.ok(lists.requester.some((p) => p.email === JAMIE));
   // No it-support member signs in on the left, not even the super admin.
   assert.ok(
-    !lists.requester.some((p) => [ROSA, THEO, "sam.whitfield@example.test"].includes(p.email)),
+    !lists.requester.some((p) => [CASEY, THEO, "sam.whitfield@example.test"].includes(p.email)),
   );
   for (const [side, email] of [
-    ["requester", ROSA],
+    ["requester", CASEY],
     ["requester", "sam.whitfield@example.test"],
     ["helpdesk", JAMIE],
     ["helpdesk", "sam.whitfield@example.test"],
     ["helpdesk", "nobody@example.test"],
-    ["admin", ROSA],
+    ["admin", CASEY],
   ]) {
     const r = await d.request("POST", "/api/sign-in", { side, email });
     assert.equal(r.status, 400, `${side} ${email}`);
@@ -223,7 +223,7 @@ test("ts_t2_routes_need_a_side_token_from_this_session", async () => {
   assert.equal(forged.status, 401);
   // A real token from another session's issuer fails here.
   const other = new SideSignIns(new DevIssuer());
-  const { token } = await other.signIn("helpdesk", ROSA);
+  const { token } = await other.signIn("helpdesk", CASEY);
   assert.equal((await d.request("GET", "/api/log", undefined, { identity: token })).status, 401);
   // Without this session's own token nothing is answered, side token or not.
   const wrongSession = await d.request("GET", "/api/current", undefined, {
@@ -267,17 +267,17 @@ test("ts_t2_a_helpdesk_filed_reset_needs_the_other_persona", async () => {
     [THEO],
   );
   assert.equal(d.session.peek(runId)?.status, "running");
-  // Switch the right side to Rosa: her Approve runs the reset.
-  await d.signIn("helpdesk", ROSA);
-  const rosa = await d.decide(runId, pending.id, "approve");
-  assert.equal(rosa.status, 200, JSON.stringify(rosa.data));
-  assert.equal(rosa.data.by, ROSA);
+  // Switch the right side to Casey: her Approve runs the reset.
+  await d.signIn("helpdesk", CASEY);
+  const casey = await d.decide(runId, pending.id, "approve");
+  assert.equal(casey.status, 200, JSON.stringify(casey.data));
+  assert.equal(casey.data.by, CASEY);
   const done = await d.finished(runId);
   assert.equal(done.status, "answered");
   const call = (done.events as Record<string, unknown>[]).find((e) => e.tool === "reset_mfa");
   assert.equal(call?.decision, "approved");
   const approved = d.store.audit.find((r) => r.event === "write_approved");
-  assert.equal(approved?.approver, ROSA);
+  assert.equal(approved?.approver, CASEY);
   const refused = d.store.audit.find((r) => r.event === "approval_refused");
   assert.equal(refused?.approver, THEO);
   assert.ok(
@@ -312,7 +312,7 @@ test("ts_t2_the_left_side_can_never_approve", async () => {
 test("ts_t2_the_left_side_sees_its_reply_not_the_proposal_or_the_audit", async () => {
   const d = await demo([reset(JAMIE), DONE]);
   await d.signIn("requester", JAMIE);
-  await d.signIn("helpdesk", ROSA);
+  await d.signIn("helpdesk", CASEY);
   const runId = await d.start("requester", "reset my MFA");
   await d.pendingOf(runId);
   const left = await d.view(runId, "requester");
@@ -356,8 +356,8 @@ test("ts_t2_privileged_resets_and_grants_are_refused_before_anyone_is_asked", as
 
 test("ts_t2_gate_honours_only_its_own_operators", async () => {
   const issuer = new DevIssuer();
-  const outsider = await issuer.signIn(ROSA); // a valid sign-in, but not one of the gate's
-  const pool = [await issuer.signIn(ROSA), await issuer.signIn(THEO)];
+  const outsider = await issuer.signIn(CASEY); // a valid sign-in, but not one of the gate's
+  const pool = [await issuer.signIn(CASEY), await issuer.signIn(THEO)];
   const gate = new Gate({
     directory: Directory.load(),
     approver: () => new ApprovedBy(outsider),

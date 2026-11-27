@@ -39,7 +39,7 @@ export const ASK_PROMPT_TOKEN_CEILING = 20_000;
 export const ASK_WORST_CASE_USD = 0.02;
 
 export const ASK_SYSTEM_PROMPT = `\
-You answer IT how-to questions for employees of Larkspur Labs, a fictional company in a \
+You answer IT how-to questions for employees of Savory Air, a fictional company in a \
 public demo. Use only the search_runbooks tool and answer from what the runbooks say.
 
 - Search first. Answer in a few plain sentences, then name the runbook you used on its \

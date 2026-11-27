@@ -23,12 +23,12 @@ export interface ToolGrant {
 
 /** The scope and audience each tool needs (docs/identity-plan.md, Tokens). */
 export const TOOL_GRANTS: Readonly<Record<string, ToolGrant>> = {
-  lookup_user: { audience: "larkspur-directory", scope: "directory:read" },
-  list_devices: { audience: "larkspur-directory", scope: "devices:read" },
-  search_runbooks: { audience: "larkspur-runbooks", scope: "runbooks:read" },
-  reset_mfa: { audience: "larkspur-directory", scope: "directory:mfa.reset" },
-  add_to_group: { audience: "larkspur-directory", scope: "directory:group.add" },
-  escalate: { audience: "larkspur-tickets", scope: "tickets:escalate" },
+  lookup_user: { audience: "savory-air-directory", scope: "directory:read" },
+  list_devices: { audience: "savory-air-directory", scope: "devices:read" },
+  search_runbooks: { audience: "savory-air-runbooks", scope: "runbooks:read" },
+  reset_mfa: { audience: "savory-air-directory", scope: "directory:mfa.reset" },
+  add_to_group: { audience: "savory-air-directory", scope: "directory:group.add" },
+  escalate: { audience: "savory-air-tickets", scope: "tickets:escalate" },
 };
 
 export class GrantError extends Error {

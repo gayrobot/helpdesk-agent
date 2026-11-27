@@ -6,7 +6,7 @@
  *
  * - **Left, the requester:** any directory user outside `it-support`. Files tickets and
  *   sees its own runs' replies, never a proposal, a tool result or the audit trail.
- * - **Right, the helpdesk:** Rosa Delgado or Theo Park (`it-support`), switchable. Sees
+ * - **Right, the helpdesk:** Casey Nguyen or Theo Park (`it-support`), switchable. Sees
  *   every run with its tool calls, the approval queue and the audit trail, may file
  *   tickets of its own, and is the only side that can approve or deny.
  *
@@ -41,7 +41,7 @@ import { BadRequest, Busy, type Session } from "./session.ts";
 export const IDENTITY_HEADER = "X-Helpdesk-Identity";
 
 /** The right side's two personas (the plan names them). Checked against the directory. */
-export const DEMO_HELPDESK = ["rosa.delgado@example.test", "theo.park@example.test"] as const;
+export const DEMO_HELPDESK = ["casey.nguyen@example.test", "theo.park@example.test"] as const;
 
 /** Tickets per session, both sides together. At most the 20 runs a session stores. */
 export const DEMO_MAX_TICKETS = 8;

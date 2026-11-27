@@ -116,7 +116,7 @@ async function handler(tool: "reset_mfa" | "add_to_group", now?: () => number) {
   const { gate } = await makeGate();
   const signIn = await TEST_ISSUER.signIn(JAMIE);
   const scope = tool === "reset_mfa" ? "directory:mfa.reset" : "directory:group.add";
-  const grant = () => signIn.grant("larkspur-directory", scope, "T-TEST");
+  const grant = () => signIn.grant("savory-air-directory", scope, "T-TEST");
   const spec = TOOLS.get(tool);
   assert.ok(spec);
   return { gate, spec, grant, authority: new ReceiptAuthority(now), resources: signIn.resources };
@@ -142,7 +142,7 @@ test("ts_i4_receipt_refused[approved for one group, run for another]", async () 
     runWithGrant(
       h.spec,
       h.gate.ctx,
-      { email: JAMIE, group: "salesforce-users" },
+      { email: JAMIE, group: "crm-users" },
       await h.grant(),
       h.resources,
       { token, authority: h.authority },

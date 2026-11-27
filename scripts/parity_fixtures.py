@@ -291,7 +291,7 @@ def _gate_cases() -> list[dict[str, Any]]:
         "ADMINS ",
         "domain-admins",
         "okta-super-admins",
-        "aws-prod-admins",
+        "ecommerce-prod-admins",
         "finance-approvers",
         "admins​",
         "Ａｄｍｉｎｓ",
@@ -319,12 +319,12 @@ def _gate_cases() -> list[dict[str, Any]]:
     )
     case(
         "already member",
-        [step("add_to_group", {"email": JAMIE, "group": "engineering"})],
+        [step("add_to_group", {"email": JAMIE, "group": "ecommerce"})],
         approver="approve",
     )
     for email in [
         "sam.whitfield@example.test",
-        "rosa.delgado@example.test",
+        "casey.nguyen@example.test",
         "grace.lin@example.test",
     ]:
         case(f"privileged reset {email}", [step("reset_mfa", {"email": email})], approver="approve")
@@ -1026,7 +1026,7 @@ RUNNER_SCRIPTS = {
             "content": [("tool_use", "search_runbooks", {"query": "set up VPN"}, "t1")],
             "stop": "tool_use",
         },
-        {"content": [("text", "Install Larkspur Connect. Source: vpn-setup")], "stop": "end_turn"},
+        {"content": [("text", "Install Savory Connect. Source: vpn-setup")], "stop": "end_turn"},
     ],
     "E018": [  # how-to: refusal, so not graded
         {"content": [], "stop": "refusal"},

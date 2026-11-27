@@ -212,7 +212,7 @@ for (const group of [
   "ADMINS ",
   "domain-admins",
   "okta-super-admins",
-  "aws-prod-admins",
+  "ecommerce-prod-admins",
   "finance-approvers",
   "admins​",
   "Ａｄｍｉｎｓ",
@@ -258,7 +258,7 @@ test("test_already_member_is_an_error_without_prompt", async () => {
     "add_to_group",
     {
       email: JAMIE,
-      group: "engineering",
+      group: "ecommerce",
     },
   );
   assert.equal(outcome.decision, Decision.TOOL_ERROR);
@@ -267,7 +267,7 @@ test("test_already_member_is_an_error_without_prompt", async () => {
 
 for (const email of [
   "sam.whitfield@example.test",
-  "rosa.delgado@example.test",
+  "casey.nguyen@example.test",
   "grace.lin@example.test",
 ]) {
   test(`test_mfa_reset_refused_for_privileged_accounts[${email}]`, async () => {

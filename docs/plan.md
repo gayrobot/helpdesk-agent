@@ -23,7 +23,7 @@ API credits arrive around 2026-11-18. Until then, everything is built and tested
 
 The project is now a web app, not only a CLI. Order: see it work locally, rewrite it web-native, add identity, build the public site, deploy. The old Phase 6 (a static write-up page) moves to Phase 10. Agent identity is specified in [identity-plan.md](identity-plan.md), whose phases are numbered I1–I6.
 
-**Moving to Savory Air (decided 2026-11-27, Skylar):** the helpdesk moves from Larkspur Labs to Savory Air, the sister repo `identity-lifecycle-agent`'s fictional retailer, because the two demos fold into one project and share the Okta tenant. Identity I5 pauses until the move lands. Proposal, sequence and "done when" for each step: [savory-air-move.md](savory-air-move.md).
+**Moving to Savory Air (decided 2026-11-27, Skylar):** the helpdesk moves from Larkspur Labs to Savory Air, the sister repo `identity-lifecycle-agent`'s fictional retailer, because the two demos fold into one project and share the Okta tenant. Identity I5 pauses until the move lands. Proposal, sequence and "done when" for each step: [savory-air-move.md](savory-air-move.md). **New baseline of record (2026-11-27):** [`evals/results/2026-11-27T203630Z.json`](../evals/results/2026-11-27T203630Z.json): 62/62, grader 9/14, $0.0098 per ticket. The TypeScript run meets the parity bar against it. The Larkspur baselines below are history.
 
 **Before Phase 7 (Skylar):** create the Okta Integrator Free Plan org. See `docs/operator-checklist.md`. Nothing uses it until Phase 8 (I5), and it holds synthetic users only.
 
@@ -105,7 +105,7 @@ Phases I1–I5 of `identity-plan.md`, in the TypeScript code.
 - **Receipts.** On approval the gate freezes the arguments it showed and signs a 120-second, single-use receipt with its own in-memory key: approver, ticket, tool, `args_sha256`. The write handler recomputes the hash from the arguments it is about to run and refuses on any difference, so approve-then-swap fails at the gate and at the handler.
 - **Audit chain.** `write_approved` records the approver, `args_sha256` and the receipt's `jti`, never the receipt. Every audit record carries `prev` and `hash` (SHA-256 over canonical JSON), in the in-memory, file and session sinks. The file and session sinks continue the chain after a restart.
 - **`npm --prefix web run audit:verify -- <file>`** walks a trail and reports the first break. It is tamper-evident, not immutable.
-- **Who approves:** on the Python page, `theo.park@example.test`. In the Worker (tier 2), whoever is signed in on the helpdesk side at the click: Rosa Delgado or Theo Park.
+- **Who approves:** on the Python page, `theo.park@example.test`. In the Worker (tier 2), whoever is signed in on the helpdesk side at the click: Casey Nguyen or Theo Park (Rosa Delgado or Theo Park before the Savory Air move).
 
 ### Phase 9: public site (a proof of concept)
 
@@ -113,14 +113,14 @@ Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a
 
 **Labelling.** Every page says what is real and what is simulated. The approval card's effect line ends with "(simulated: changes this demo's copy only)", next to Approve. Every page says:
 - **Real:** the model, the governance code, the Okta sign-in, the audit trail and the eval numbers.
-- **Simulated:** Larkspur Labs, its directory, devices and runbooks. "Reset MFA" changes a flag in the visitor's own session copy and nothing else. A banner says the company is fictional and real details must not be entered.
+- **Simulated:** Savory Air, its directory, devices and runbooks. "Reset MFA" changes a flag in the visitor's own session copy and nothing else. A banner says the company is fictional and real details must not be entered.
 
 **Three tiers:**
 
 | Tier | Who | What they can do | Identity |
 | --- | --- | --- | --- |
 | 1. Anonymous | Anyone | The explainer page, plus runbook questions only (`search_runbooks` and the reply; no directory reads, no writes). Haiku. | none |
-| 2. Guided demo | Anyone | A requester persona on the left and a **helpdesk** persona (`it-support`) on the right. The helpdesk side can approve the requester's write, or ask the agent itself to reset MFA for an ordinary user, as a test of agent permissions (below). The I1–I4 rules hold: reads filtered by role, a stranger's write refused before approval, and no one approves their own request: a reset the helpdesk files needs the *other* helpdesk persona's Approve (the right side switches between two, e.g. Rosa Delgado and Theo Park). Writes change only that session's Durable Object. | The dev issuer, labelled "simulated sign-in" on the page |
+| 2. Guided demo | Anyone | A requester persona on the left and a **helpdesk** persona (`it-support`) on the right. The helpdesk side can approve the requester's write, or ask the agent itself to reset MFA for an ordinary user, as a test of agent permissions (below). The I1–I4 rules hold: reads filtered by role, a stranger's write refused before approval, and no one approves their own request: a reset the helpdesk files needs the *other* helpdesk persona's Approve (the right side switches between two, e.g. Casey Nguyen and Theo Park). Writes change only that session's Durable Object. | The dev issuer, labelled "simulated sign-in" on the page |
 | 3. Real sign-in | Skylar and invited reviewers, behind Cloudflare Access | Everything in tier 2, signed in through Okta with per-tool scoped tokens, and the right side is an **admin**, who can also edit user records directly (below) | Okta (I5) |
 
 **Agent permissions, the point of tier 2** (decided 2026-11-25):
@@ -151,7 +151,7 @@ Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a
 - **The API key:** the site uses the project's one key (`HelpDeskAgent` in 1Password); there is no separate development key. That workspace has no Console spend limit, so the Worker's own budget is the cap.
 
 **Tier 2 as built** (2026-11-27, `web/src/demo.ts`):
-- **Sign-in:** each side signs in through the session's dev issuer and holds its own token (`X-Helpdesk-Identity`). The left side can be any directory user outside `it-support`; the right side is Rosa Delgado or Theo Park. The server takes the side and persona from the token, never from the request body.
+- **Sign-in:** each side signs in through the session's dev issuer and holds its own token (`X-Helpdesk-Identity`). The left side can be any directory user outside `it-support`; the right side is Casey Nguyen or Theo Park. The server takes the side and persona from the token, never from the request body.
 - **Approvals:** the approver is whoever is signed in on the right at the click. An Approve the I4 rules refuse returns the rule, is audited as `approval_refused`, and leaves the proposal pending for the other persona. The gate checks the actual approver again before it signs the receipt.
 - **Limits, before any model call:**
   - `MODEL_CALLS`

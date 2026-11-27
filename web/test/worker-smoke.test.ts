@@ -35,7 +35,7 @@ test("the Worker listens on loopback only", () => {
 test("health: the core runs in workerd with the bundled data", async () => {
   const res = await fetch(new URL("/api/health", base));
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true, runbooks: 14, chunks: 65, users: 30 });
+  assert.deepEqual(await res.json(), { ok: true, runbooks: 14, chunks: 65, users: 46 });
   assert.equal(res.headers.get("x-content-type-options"), "nosniff");
 });
 

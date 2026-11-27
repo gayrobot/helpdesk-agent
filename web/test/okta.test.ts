@@ -19,8 +19,8 @@ import {
 import { importKeySet, JwksKeySet, jwksUri, OktaGrantVerifier, oktaIssuer } from "../src/okta.ts";
 
 const NOW = 1_795_000_000;
-const ISSUER = "https://larkspur-test.okta.com/oauth2/aus000000000test";
-const AUDIENCE = "api://larkspur-helpdesk";
+const ISSUER = "https://savory-air-test.okta.com/oauth2/aus000000000test";
+const AUDIENCE = "api://savory-air-helpdesk";
 const SIGN_IN_APP = "0oasignin0000test";
 const AGENT_APP = "0oaagent00000test";
 const JAMIE = "jamie@example.test";
@@ -132,12 +132,12 @@ test("issuer must be an Okta custom authorization server over https", () => {
   assert.equal(oktaIssuer(ISSUER), ISSUER);
   assert.equal(jwksUri(ISSUER), `${ISSUER}/v1/keys`);
   for (const bad of [
-    "http://larkspur-test.okta.com/oauth2/aus1",
-    "https://larkspur-test.okta.com",
+    "http://savory-air-test.okta.com/oauth2/aus1",
+    "https://savory-air-test.okta.com",
     "https://evil.test/oauth2/aus1",
-    "https://larkspur-test.okta.com.evil.test/oauth2/aus1",
-    "https://larkspur-test.okta.com/oauth2/aus1/",
-    "urn:larkspur:dev-issuer",
+    "https://savory-air-test.okta.com.evil.test/oauth2/aus1",
+    "https://savory-air-test.okta.com/oauth2/aus1/",
+    "urn:savory-air:dev-issuer",
   ]) {
     assert.throws(() => oktaIssuer(bad), Error, bad);
   }
@@ -255,7 +255,7 @@ test("grant attacks fail closed", async () => {
     ["a chain of actors", g({ act: { sub: AGENT_APP, act: { sub: "0oaother" } } })],
     ["cid is another client", g({ cid: "0oaother" })],
     ["subject token at a tool", sign(subjectClaims({ jti: "AT.s2" }))],
-    ["wrong audience", g({ aud: "api://larkspur-tickets" })],
+    ["wrong audience", g({ aud: "api://savory-air-tickets" })],
     ["wrong issuer", g({ iss: "https://other.okta.com/oauth2/aus1" })],
     ["sub not a directory email", g({ sub: "00ujamie000test" })],
     ["expired", g({ iat: NOW - 900, exp: NOW - 600 })],

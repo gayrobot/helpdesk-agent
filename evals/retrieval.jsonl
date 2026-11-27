@@ -3,7 +3,7 @@
 {"id": "R003", "query": "Do I have to disconnect the VPN to join a Zoom call?", "expected_runbook": "vpn-setup"}
 {"id": "R004", "query": "VPN says portal unreachable at the hotel", "expected_runbook": "vpn-troubleshooting"}
 {"id": "R005", "query": "I'm connected to the VPN but the wiki won't load", "expected_runbook": "vpn-troubleshooting"}
-{"id": "R006", "query": "Larkspur Connect keeps saying authentication failed", "expected_runbook": "vpn-troubleshooting"}
+{"id": "R006", "query": "Savory Connect keeps saying authentication failed", "expected_runbook": "vpn-troubleshooting"}
 {"id": "R007", "query": "I got a new phone and can't approve sign-in pushes anymore", "expected_runbook": "okta-verify-reenrollment"}
 {"id": "R008", "query": "How do I set up Okta Verify again after my MFA was reset?", "expected_runbook": "okta-verify-reenrollment"}
 {"id": "R009", "query": "I lost my security key, what now?", "expected_runbook": "okta-verify-reenrollment"}
@@ -18,7 +18,7 @@
 {"id": "R018", "query": "Can I get a Figma seat?", "expected_runbook": "software-requests"}
 {"id": "R019", "query": "I need a tool that isn't in Self Service, how do I request it?", "expected_runbook": "software-requests"}
 {"id": "R020", "query": "Can I install a Chrome extension that's blocked?", "expected_runbook": "software-requests"}
-{"id": "R021", "query": "How do I get added to the salesforce-users group?", "expected_runbook": "access-requests"}
+{"id": "R021", "query": "How do I get added to the crm-users group?", "expected_runbook": "access-requests"}
 {"id": "R022", "query": "Can my manager request GitHub access for me?", "expected_runbook": "access-requests"}
 {"id": "R023", "query": "How does someone get admin rights?", "expected_runbook": "access-requests"}
 {"id": "R024", "query": "A contractor needs access to another group", "expected_runbook": "access-requests"}

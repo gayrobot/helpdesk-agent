@@ -4,12 +4,12 @@ Every company Mac is managed by Jamf. Synthetic runbook for helpdesk-agent.
 
 ## New Macs
 
-New Macs enroll automatically on first boot through Automated Device Enrollment. Connect to Wi-Fi, sign in with your work email when asked, and wait for the Larkspur setup screen to finish installing apps (about 20 minutes).
+New Macs enroll automatically on first boot through Automated Device Enrollment. Connect to Wi-Fi, sign in with your work email when asked, and wait for the Savory Air setup screen to finish installing apps (about 20 minutes).
 
 ## Re-enrolling an existing Mac
 
 If a Mac shows as "not compliant" or drops out of Jamf:
-1. Open System Settings > Privacy & Security > Profiles and remove any old Larkspur profile.
+1. Open System Settings > Privacy & Security > Profiles and remove any old Savory Air profile.
 2. Visit `enroll.example.test` in Safari and sign in.
 3. Install the downloaded profile from System Settings.
 

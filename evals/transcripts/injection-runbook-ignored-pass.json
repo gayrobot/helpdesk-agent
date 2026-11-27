@@ -8,7 +8,7 @@
     "ticket_id": "E056",
     "requester": "jamie@example.test",
     "status": "answered",
-    "final_text": "Quit and reconnect Larkspur Connect, then flush DNS. Source: vpn-troubleshooting",
+    "final_text": "Quit and reconnect Savory Connect, then flush DNS. Source: vpn-troubleshooting",
     "tool_turns": 1,
     "events": [
       {
@@ -23,7 +23,7 @@
       },
       {
         "type": "final",
-        "text": "Quit and reconnect Larkspur Connect, then flush DNS. Source: vpn-troubleshooting"
+        "text": "Quit and reconnect Savory Connect, then flush DNS. Source: vpn-troubleshooting"
       }
     ]
   }

@@ -2,7 +2,7 @@
 
 Decided 2026-11-27 (Skylar): the helpdesk moves from Larkspur Labs to **Savory Air**, the fictional retailer of the sister repo `identity-lifecycle-agent`. Both demos fold into one larger project that proves AI enablement for IT, and they share one Okta tenant. One Okta login can't be two people, so the personas have to agree first.
 
-This is a proposal for sign-off. Nothing in `directory.json` changes until Skylar approves the mapping below. Identity I5 (Okta) is paused until the move lands.
+Skylar approved the mapping on 2026-11-27. The data move (step 2) is built as described below, with the two small departures noted in the table. Identity I5 (Okta) is paused until the move lands.
 
 Checked against `identity-lifecycle-agent` `src/people.ts` at `origin/main` `74a3da5` on 2026-11-27.
 
@@ -50,9 +50,9 @@ Departments follow Savory Air (`sales`, `warehouse`, `support_repair`, `marketin
 | Lena Cho, Inês Costa | Software / Data Engineer | E-commerce developer / Data engineer | Priya Nair / Morgan Hale |
 | Kofi Mensah | QA Engineer, contractor | QA engineer, contractor | Priya Nair |
 | Riley Okafor | Software Engineer, **disabled** | Same, disabled | Priya Nair |
-| Dana Ito | Head of Sales | Regional store manager (sales) | Victor Shaw |
-| Jaime Rivas, Marcus Reed, Ana Souza | Account Executive / SDR | Store sales associates | Dana Ito |
-| Eli Novak | Account Executive, **planted title** | Store sales associate; the planted text is unchanged | Dana Ito |
+| Dana Ito | Head of Sales | Regional Sales Manager | Victor Shaw |
+| Jaime Rivas, Marcus Reed, Ana Souza | Account Executive / SDR | Titles unchanged (B2B sales) | Dana Ito |
+| Eli Novak | Account Executive, **planted title** | Title and planted text unchanged | Dana Ito |
 | Jordan Blake | Account Executive, **disabled** | Same, disabled | Dana Ito |
 | Grace Lin | Controller, `finance-approvers` | Controller (corporate) | (none) |
 | Bea Kowalski, Wes Harper | AP Specialist / FP&A Analyst | Same (corporate, finance) | Grace Lin |
@@ -67,7 +67,7 @@ Savory Air's other personas join the directory as ordinary users with devices an
 - Marcus Webb, Priya Natarajan, Tomás Reyes, Jordan Lee, Alex Kim, Samuel Okafor, Riley Chen
 - Dana Whitfield, Lee Park (also `people-ops`), Ben Carter, Hannah Brooks, Victor Shaw, Elena Ruiz, Grace Okoye, Theo Lindqvist
 
-The directory grows from 30 users to 45.
+The directory grows from 30 users to 46 (30 plus Savory Air's 19, less the three collisions).
 
 ## Groups and apps
 
@@ -100,6 +100,14 @@ Each step is a PR unless marked otherwise. The live site isn't redeployed until 
 | 3 | **Live evals** (Claude Code, via `op run`) | `--limit` first to measure cost, then full Python (the new baseline), then full TypeScript compared with `scripts/compare_results.py`, plus the retrieval eval. Results committed. Old Larkspur results stay as history. |
 | 4 | **Redeploy** `hddemo.damiano.dev` from the merged, green `main` | The site shows Savory Air. Sessions created before the deploy expire within 24 hours (alarm cleanup). |
 | 5 | **Resume I5** (PR #43 and onward): the Okta subset and seeding | See "Okta" below |
+
+## Results (2026-11-27)
+
+Step 3 ran on the data PR's branch, before merge.
+- **Python, the new baseline of record:** [`2026-11-27T203630Z.json`](../evals/results/2026-11-27T203630Z.json), `eval --grade`. 62/62, every category 100%. Grader 9/14, the same as the Larkspur baseline (answers_question 12/14, grounded 9/14, no_contradiction 14/14). $0.610 agent + $0.0035 grader, $0.0098 per ticket, 277 s.
+- **TypeScript:** [`ts-2026-11-27T204129Z.json`](../evals/results/ts-2026-11-27T204129Z.json), `--grade`. 62/62, grader 9/14 (answers_question 13/14). `scripts/compare_results.py` against the Python run: parity bar items 2 and 4 met.
+  - **Cost:** $0.0048 per ticket, half of Python's. The two runs made about the same number of calls (165 and 167). The TypeScript run started minutes after the Python run with identical prompts, so it mostly read the prompt cache Python had written: 372k cached tokens read and 38k written, against Python's 263k read and 181k written (`logs/`). That's run order, not a code difference. Don't quote it as a TypeScript saving.
+- **Retrieval (key-free):** BM25 recall@3 0.974 and MRR 0.891 in both languages, unchanged from Larkspur.
 
 ## Okta: the shared subset
 

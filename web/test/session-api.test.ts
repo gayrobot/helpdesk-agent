@@ -408,7 +408,7 @@ test("test_double_click_cannot_approve_the_next_write", async () => {
       message(
         [
           toolUse("reset_mfa", { email: JAMIE }, "toolu_a"),
-          toolUse("add_to_group", { email: JAMIE, group: "design" }, "toolu_b"),
+          toolUse("add_to_group", { email: JAMIE, group: "creative" }, "toolu_b"),
         ],
         "tool_use",
       ),
@@ -619,7 +619,7 @@ test("ts_an_approved_write_survives_a_restart", async () => {
       message(
         [
           toolUse("reset_mfa", { email: JAMIE }, "toolu_a"),
-          toolUse("add_to_group", { email: JAMIE, group: "design" }, "toolu_b"),
+          toolUse("add_to_group", { email: JAMIE, group: "creative" }, "toolu_b"),
         ],
         "tool_use",
       ),
@@ -636,7 +636,7 @@ test("ts_an_approved_write_survives_a_restart", async () => {
   assert.equal((await second.snapshot(runId)).status, "interrupted");
   const jamie = store.directory?.users.find((u) => u.email === JAMIE);
   assert.equal(jamie?.mfa.enrolled, false); // the approved reset was kept
-  assert.ok(!jamie?.groups.includes("design")); // the pending add never ran
+  assert.ok(!jamie?.groups.includes("creative")); // the pending add never ran
 });
 
 test("ts_no_token_reaches_a_response_log_or_storage", async () => {

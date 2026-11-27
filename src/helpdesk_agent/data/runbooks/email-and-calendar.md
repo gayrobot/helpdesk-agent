@@ -8,7 +8,7 @@ Shared mailboxes (for example `support@example.test`) are Google Groups. The mai
 
 ## Calendar delegation
 
-To let an assistant manage your calendar, open Calendar settings, choose "Share with specific people", add them and pick "Make changes and manage sharing". Delegation only works between people at Larkspur Labs.
+To let an assistant manage your calendar, open Calendar settings, choose "Share with specific people", add them and pick "Make changes and manage sharing". Delegation only works between people at Savory Air.
 
 ## Out of office
 

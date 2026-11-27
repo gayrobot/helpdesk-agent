@@ -23,7 +23,7 @@ import {
 import { TOOLS, type ToolSpec } from "../src/tools.ts";
 import { JAMIE, makeGate, RecordingApprover } from "./helpers.ts";
 
-const DIR = "larkspur-directory";
+const DIR = "savory-air-directory";
 const TICKET = "T-TEST";
 const NOW = 1_800_000_000;
 const JWT = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/;
@@ -82,7 +82,7 @@ const BAD_CLAIMS: [string, (c: Record<string, unknown>) => Record<string, unknow
   ["issued in the future", (c) => ({ ...c, iat: NOW + 120, exp: NOW + 150 }), /future/],
   ["lives too long", (c) => ({ ...c, exp: NOW + 3600 }), /too long/],
   ["wrong issuer", (c) => ({ ...c, iss: "https://evil.example.test" }), /wrong issuer/],
-  ["wrong audience", (c) => ({ ...c, aud: "larkspur-runbooks" }), /wrong audience/],
+  ["wrong audience", (c) => ({ ...c, aud: "savory-air-runbooks" }), /wrong audience/],
   ["audience as an array", (c) => ({ ...c, aud: [DIR] }), /wrong audience/],
   ["read scope used for a write", (c) => c, /wrong scope/], // verified for mfa.reset below
   ["two scopes", (c) => ({ ...c, scope: "directory:read directory:mfa.reset" }), /wrong scope/],
@@ -183,15 +183,15 @@ test("ts_i2_exchange_issues_one_scope_for_one_audience_and_ticket", async () => 
   // The same grant at another resource, for another scope or ticket: refused.
   const again = await signIn.grant(DIR, "directory:read", TICKET);
   await assert.rejects(
-    signIn.resources.get("larkspur-tickets").verify(again, "tickets:escalate", TICKET),
+    signIn.resources.get("savory-air-tickets").verify(again, "tickets:escalate", TICKET),
     /wrong audience/,
   );
 });
 
 test("ts_i2_exchange_refuses_scopes_a_resource_does_not_offer", async () => {
   const signIn = await new DevIssuer().signIn(JAMIE);
-  await assert.rejects(signIn.grant("larkspur-runbooks", "directory:read", TICKET), /scope not/);
-  await assert.rejects(signIn.grant("larkspur-hr", "hr:read", TICKET), /unknown resource/);
+  await assert.rejects(signIn.grant("savory-air-runbooks", "directory:read", TICKET), /scope not/);
+  await assert.rejects(signIn.grant("savory-air-hr", "hr:read", TICKET), /unknown resource/);
   await assert.rejects(signIn.grant(DIR, "directory:*", TICKET), /scope not/);
   await assert.rejects(signIn.grant(DIR, "directory:read", "T 1\n"), /bad ticket id/);
   await assert.rejects(signIn.grant("__proto__", "x", TICKET), /unknown resource/);
@@ -315,7 +315,7 @@ test("ts_i2_refused_calls_get_no_grant", async () => {
   const { gate, audit } = await makeGate();
   await gate.execute("reset_mfa", { email: JAMIE }); // denied by the human
   await gate.execute("nope", {});
-  await gate.execute("add_to_group", { email: JAMIE, group: "aws-prod-admins" }); // policy
+  await gate.execute("add_to_group", { email: JAMIE, group: "ecommerce-prod-admins" }); // policy
   for (const r of audit.records.filter((x) => x.event === "tool_call")) {
     assert.equal(r.grant, undefined, String(r.decision));
   }

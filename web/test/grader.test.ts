@@ -161,7 +161,7 @@ test("test_api_error_is_ungraded_and_logged", async () => {
 
 const agentAnswer = () => [
   message([toolUse("search_runbooks", { query: "set up VPN" })], "tool_use"),
-  message([text("Install Larkspur Connect. Source: vpn-setup")], "end_turn"),
+  message([text("Install Savory Connect. Source: vpn-setup")], "end_turn"),
 ];
 
 test("test_grading_never_changes_the_deterministic_score_and_costs_apart", async () => {
