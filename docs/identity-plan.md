@@ -178,6 +178,29 @@ Checked on 2026-11-24. Re-check against Okta's current docs before building.
 - New secrets (org URL, client ID, the agent's private key) go in 1Password and are referenced from `.env.tpl`, same as the API key.
 - **Skylar only:** creating the org, apps, authorization server and policies; every device sign-in; every approval. Add these to `docs/operator-checklist.md`. Claude Code never completes a sign-in.
 
+### I5 findings (2026-11-27)
+
+Re-checked against Okta's docs on 2026-11-27. "To confirm" means the docs don't say, and it gets checked in the admin console during setup.
+
+- **Everything is OIDC / OAuth 2.0.** Three things in Okta: an OIDC sign-in app (Authorization Code with PKCE), an API Services app for the agent with the Token Exchange grant, and a custom authorization server with our scopes and an access policy. The Device Authorization grant for command-line tools is deferred; the site doesn't need it.
+- **Tokens:** RS256, keys at `<issuer>/v1/keys`, selected by `kid`. Claims include `iss`, `aud`, `sub`, `cid`, `uid`, `scp` (an array), `jti`, `iat`, `exp`.
+- **The acting service:** the exchanged token carries `act: {"sub": "<agent client id>", "sub_profile": "service"}`, plus `cid`. That maps onto our `act` check, with the agent's Okta client id in place of `helpdesk-agent`. Earlier actors nest as `act.act`; we refuse any nesting.
+- **The exchange** goes to the authorization server whose audience is requested, which must list the subject token's server under Trusted servers.
+- **Limits, kept rather than worked around:**
+  - **No `ticket_id` claim** (claims come from Okta expressions, not request parameters, without an inline hook). Ticket binding stays in the harness. Reuse in another ticket is still refused, because the session's replay cache takes each `jti` once.
+  - **One audience per authorization server**, so the dev issuer's three resource audiences become three servers or one shared audience. Open decision.
+- **To confirm:**
+  - the shortest access token lifetime Okta allows (it may be minutes, not our 60 seconds)
+  - whether `sub` is the login by default (we require a directory email)
+  - whether the agent app can use `private_key_jwt` for the exchange
+  - whether a Web app can require PKCE
+  - free-plan caps on users and authorization servers
+- **Built, key-free** (`web/src/okta.ts`, `OktaSubjectVerifier` in `web/src/identity.ts`, `web/test/okta.test.ts`): RS256 next to ES256, a JWKS key set that refetches at most once a minute for an unknown `kid`, and verifiers for Okta sign-in tokens and exchanged grants. They run the token attack list against Okta-shaped tokens signed with keys generated at test time. Nothing is wired to the site yet.
+- **Open decisions (Skylar):**
+  - **The dev-issuer rule versus tier 2.** `DevIssuer` refuses to start while a real issuer is configured (a hard rule in `CLAUDE.md`). Tier 2 (dev issuer) and tier 3 (Okta) share one Worker, so the rule needs re-scoping, for example per route or per session, before tier 3 is wired.
+  - **One audience or three** (above).
+  - **Which personas go into Okta,** and who is the `directory-admins` persona. (2026-11-27, Skylar: the tenant is shared with `identity-lifecycle-agent` (Savory Air), and the helpdesk personas will change to line up with that project.) Today three emails mean different people in the two projects: Rosa Delgado (IT approver here, warehouse director there), Morgan Hale and Omar Haddad. The tenant may be capped at ten active users across both demos. The persona set must be agreed before anything is seeded.
+
 ## I6 notes: MCP
 
 The [MCP authorization spec](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) (revision 2026-07-28 at the time of writing; check for a newer one) treats a protected MCP server as an OAuth 2.1 resource server and requires it to publish Protected Resource Metadata (RFC 9728). Move `lookup_user`, `list_devices`, `reset_mfa` and `add_to_group` behind one. The server validates audience and scope itself and never passes a token on. This needs an MCP SDK dependency and its own review.
