@@ -6,7 +6,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 import { handleSessionApi, json, tokenOk } from "../api.ts";
-import { bundledRetriever } from "../bundled.ts";
+import { bundledAclRetriever } from "../bundled.ts";
 import type { MessagesClient } from "../client.ts";
 import type { RawDirectory } from "../data.ts";
 import { Session, type SessionStore, type StoredRun } from "../session.ts";
@@ -109,7 +109,7 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
       this.session ??= Session.open({
         client: makeClient(),
         store: new DurableStore(this.ctx.storage),
-        retriever: bundledRetriever(),
+        retriever: bundledAclRetriever(),
         ...timings,
       });
       const session = await this.session;

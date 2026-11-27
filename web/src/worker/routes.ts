@@ -10,7 +10,7 @@ import { hostOk, isLocal, json, originOk, readJson, SESSION_HEADER, tokenHash } 
 import { type AskResult, askRunbooks, handleAsk } from "../ask.ts";
 import type { Reservation } from "../budget.ts";
 import { visitorKey } from "../budget.ts";
-import { bundledChunks, bundledRetriever } from "../bundled.ts";
+import { bundledAclRetriever, bundledChunks } from "../bundled.ts";
 import type { MessagesClient } from "../client.ts";
 import { Directory } from "../directory.ts";
 import { DevIssuer } from "../identity.ts";
@@ -129,7 +129,7 @@ export async function route(
       answer: (question): Promise<AskResult> =>
         askRunbooks(question, {
           client: makeClient(),
-          retriever: bundledRetriever(),
+          retriever: bundledAclRetriever(),
           issuer: issuer as DevIssuer,
         }),
     });
