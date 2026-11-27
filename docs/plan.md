@@ -144,7 +144,7 @@ Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a
 **Deploy, decided 2026-11-26 (Skylar):**
 - **Where:** the site is `hddemo.damiano.dev`, deployed by Claude Code from this machine with Skylar's wrangler login, and it ships tier by tier.
 - **Tier 1 first:** tier 1 goes live before Phase 8 finishes. Tier 2 follows identity I2–I4, and tier 3 waits for Okta (I5).
-- **The API key:** the site reuses the development key. That workspace has no Console spend limit, so the Worker's own budget is the cap.
+- **The API key:** the site uses the project's one key (`HelpDeskAgent` in 1Password); there is no separate development key. That workspace has no Console spend limit, so the Worker's own budget is the cap.
 
 **Cost controls.** On a site with no real data, spend is the real risk:
 - a separate Console workspace with a low spend limit
