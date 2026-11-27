@@ -7,9 +7,14 @@
  * ticket, the agent acting for this requester, unexpired, never used before, and the
  * requester's directory account (looked up now, not when the token was minted) not
  * disabled. Anything else throws `GrantError` and nothing runs.
+ *
+ * Identity phase I4: a write also needs the gate's approval receipt, covering exactly this
+ * ticket, tool and arguments (recomputed here), approved by someone other than the
+ * requester, and used once.
  */
 import { type Grant, type Resources, TokenError } from "./identity.ts";
-import type { Args, ToolContext, ToolResult, ToolSpec } from "./tools.ts";
+import type { Receipt, ReceiptAuthority } from "./receipts.ts";
+import { type Args, type ToolContext, ToolKind, type ToolResult, type ToolSpec } from "./tools.ts";
 
 export interface ToolGrant {
   readonly audience: string;
@@ -36,9 +41,16 @@ export function toolGrant(tool: string): ToolGrant {
   return grant;
 }
 
+/** A write's approval receipt and the authority that signed it. */
+export interface ApprovalProof {
+  token: unknown;
+  authority: ReceiptAuthority;
+}
+
 /**
- * The handler side: verify `token` for this tool and this call, then run the tool.
- * Returns the tool's result and the verified grant (for the audit record).
+ * The handler side: verify `token` (and, for a write, the approval receipt) for this tool
+ * and this call, then run the tool. Returns the result plus the verified grant and
+ * receipt, for the audit record.
  */
 export async function runWithGrant(
   spec: ToolSpec,
@@ -46,7 +58,8 @@ export async function runWithGrant(
   args: Args,
   token: unknown,
   resources: Resources,
-): Promise<{ result: ToolResult; grant: Grant }> {
+  approval: ApprovalProof | null = null,
+): Promise<{ result: ToolResult; grant: Grant; receipt: Receipt | null }> {
   const needed = toolGrant(spec.name);
   let grant: Grant;
   try {
@@ -60,5 +73,18 @@ export async function runWithGrant(
   if (account && account.status !== "active") {
     throw new GrantError("grant refused: the requester's account is not active");
   }
-  return { result: await spec.run(ctx, args), grant };
+  let receipt: Receipt | null = null;
+  if (spec.kind === ToolKind.WRITE) {
+    if (!approval) throw new GrantError("receipt refused: no approval receipt");
+    try {
+      receipt = await approval.authority.verify(approval.token, ctx.ticketId, spec.name, args);
+    } catch (exc) {
+      if (exc instanceof TokenError) throw new GrantError(`receipt refused: ${exc.message}`);
+      throw exc;
+    }
+    if (receipt.approver === grant.sub) {
+      throw new GrantError("receipt refused: the requester approved their own request");
+    }
+  }
+  return { result: await spec.run(ctx, args), grant, receipt };
 }

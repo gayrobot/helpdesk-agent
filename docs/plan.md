@@ -95,6 +95,14 @@ Phases I1–I5 of `identity-plan.md`, in the TypeScript code.
 
 **I3 done 2026-11-26** (permission-filtered retrieval, `web/src/acl.ts`): every runbook has an ACL entry, and a missing entry or an unknown group fails the load. The 14 shared runbooks are `all-staff`, which everyone reads as, the anonymous guest included. Three restricted synthetic runbooks, each with a canary, exist only in the TypeScript code, so the Python corpus is unchanged: two for `it-support`, one for `people-ops`. `search_runbooks` looks up the requester's groups at call time and searches a retriever built from only the chunks they may read. BM25 statistics therefore come from the visible subset, there is one view per audience, and a hidden match is byte-identical to no match. Leak count is zero for BM25, embeddings and hybrid, asserted in CI. For staff, recall@3 and MRR equal BM25 over the shared runbooks exactly. IT support and People Ops stay within 0.05 recall@3 of that. The site, sessions and the Node eval use the ACL retriever. The `acl_denied` and `acl_allowed` eval tickets come with I4 live.
 
+**I4 done 2026-11-26** (approver identity, receipts, audit chain: `web/src/receipts.ts`, `authz.mayApprove`, the gate, `web/src/audit.ts`):
+- **Approver rules.** The gate takes an `operator` sign-in, the person answering approvals. Before they are asked, they must be an active `it-support` member who is neither the requester nor the target. Otherwise the write is refused by policy and the approver never sees it. The rule is checked again after the click.
+- **No verified approver, no write.** A `true` with no operator is not honoured. Evals and CI keep `denyAll`.
+- **Receipts.** On approval the gate freezes the arguments it showed and signs a 120-second, single-use receipt with its own in-memory key: approver, ticket, tool, `args_sha256`. The write handler recomputes the hash from the arguments it is about to run and refuses on any difference, so approve-then-swap fails at the gate and at the handler.
+- **Audit chain.** `write_approved` records the approver, `args_sha256` and the receipt's `jti`, never the receipt. Every audit record carries `prev` and `hash` (SHA-256 over canonical JSON), in the in-memory, file and session sinks. The file and session sinks continue the chain after a restart.
+- **`npm --prefix web run audit:verify -- <file>`** walks a trail and reports the first break. It is tamper-evident, not immutable.
+- **Who approves on the local page:** `theo.park@example.test` until tier 2 adds the persona switch.
+
 ### Phase 9: public site (a proof of concept)
 
 Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a helpdesk anyone uses. It exists to show three things a visitor can check: **who asked, what acted for them, and who said yes.**

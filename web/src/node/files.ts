@@ -3,10 +3,10 @@
  * The Worker uses Durable Object storage instead; nothing in `src/` outside `node/`
  * imports `node:` modules.
  */
-import { appendFile, mkdir, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { type AuditSink, buildRecord } from "../audit.ts";
+import { type AuditSink, buildRecord, GENESIS, HashChain } from "../audit.ts";
 import type { CallLog } from "../client.ts";
 import type { EscalationRecord, EscalationStore } from "../tools.ts";
 
@@ -23,19 +23,31 @@ export function sortedJson(value: unknown): string {
 export class FileAudit implements AuditSink {
   readonly path: string;
   private readonly clock: () => Date;
+  private chain: Promise<HashChain> | null = null;
 
   constructor(path: string, clock: () => Date = () => new Date()) {
     this.path = path;
     this.clock = clock;
   }
 
+  /** Continue the chain from the file's last record (identity phase I4). */
+  private async headChain(): Promise<HashChain> {
+    let head = GENESIS;
+    try {
+      const lines = (await readFile(this.path, "utf8")).trimEnd().split("\n");
+      const last = lines.at(-1);
+      if (last) head = String((JSON.parse(last) as { hash?: unknown }).hash ?? GENESIS);
+    } catch (exc) {
+      if ((exc as NodeJS.ErrnoException).code !== "ENOENT") throw exc;
+    }
+    return new HashChain(head);
+  }
+
   async record(event: string, fields: Record<string, unknown>): Promise<void> {
     await mkdir(dirname(this.path), { recursive: true });
-    await appendFile(
-      this.path,
-      `${sortedJson(buildRecord(event, fields, this.clock()))}\n`,
-      "utf8",
-    );
+    this.chain ??= this.headChain();
+    const linked = await (await this.chain).link(buildRecord(event, fields, this.clock()));
+    await appendFile(this.path, `${sortedJson(linked)}\n`, "utf8");
   }
 }
 

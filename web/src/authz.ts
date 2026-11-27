@@ -89,3 +89,27 @@ export function mayRequest(
     "request must come from that person or their manager; escalate if IT needs to look."
   );
 }
+
+/**
+ * Identity phase I4: null when `approver` may approve `requester`'s write on `target`,
+ * else why not. The approver is an active member of `it-support`, and is neither the
+ * requester nor the target: nobody approves their own request or a change to their own
+ * account.
+ */
+export function mayApprove(
+  directory: Directory,
+  approver: string,
+  requester: string,
+  target: string,
+): string | null {
+  if (!isHelpdesk(directory, approver)) {
+    return `${approver} is not an active member of ${HELPDESK_GROUP}, so they can't approve writes.`;
+  }
+  if (same(approver, requester)) {
+    return `${approver} filed this request, and nobody approves their own request.`;
+  }
+  if (same(approver, target)) {
+    return `${approver} is the account being changed, and nobody approves a change to their own account.`;
+  }
+  return null;
+}

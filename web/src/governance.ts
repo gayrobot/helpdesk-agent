@@ -22,11 +22,12 @@
  * audit sink are passed in instead of using files.
  */
 import type { AuditSink } from "./audit.ts";
-import { card, mayRequest, readView } from "./authz.ts";
+import { card, mayApprove, mayRequest, readView } from "./authz.ts";
 import { GrantError, runWithGrant, toolGrant } from "./delegation.ts";
 import { type Directory, isMixedScript, normalize } from "./directory.ts";
 import { type Grant, type Principal, SignIn, TokenError } from "./identity.ts";
 import { compareCodePoints, pyJsonDumps, pyLen, pyRepr, pyStrip } from "./pycompat.ts";
+import { type Receipt, ReceiptAuthority } from "./receipts.ts";
 import {
   type Args,
   type EscalationStore,
@@ -167,6 +168,13 @@ export interface GateOptions {
    * string; the model never supplies it, and `Gate` refuses anything an issuer didn't make.
    */
   signIn: SignIn;
+  /**
+   * Identity phase I4: who answers approvals for this gate, signed in. They must be an
+   * active member of it-support and neither the requester nor the target, checked before
+   * they're asked. Without an operator a `true` from the approver is not honoured (evals
+   * and CI use `denyAll`, which never approves).
+   */
+  operator?: SignIn | null;
   clock?: () => Date;
   /** Restrict the allowlist further (the anonymous tier allows only search_runbooks). */
   allowedTools?: ReadonlySet<string>;
@@ -180,10 +188,21 @@ interface FinishOptions {
   grant?: Grant | null;
 }
 
+/** I4 fields on approval records, by id and hash only: never the receipt itself. */
+function receiptFields(receipt: Receipt) {
+  return {
+    approver: receipt.approver,
+    args_sha256: receipt.argsSha256,
+    receipt_jti: receipt.jti,
+  };
+}
+
 export class Gate {
   readonly ctx: ToolContext;
   readonly principal: Principal;
   private readonly signIn: SignIn;
+  private readonly operator: SignIn | null;
+  private readonly receipts: ReceiptAuthority;
   private readonly allowedTools: ReadonlySet<string> | null;
   private readonly approver: Approver;
   private readonly audit: AuditSink;
@@ -197,6 +216,11 @@ export class Gate {
       throw new TypeError("requester must be a lowercase @example.test address");
     }
     this.signIn = options.signIn;
+    if (options.operator != null && !SignIn.is(options.operator)) {
+      throw new TypeError("the operator must be a SignIn from an issuer");
+    }
+    this.operator = options.operator ?? null;
+    this.receipts = new ReceiptAuthority();
     this.principal = options.signIn.principal;
     this.allowedTools = options.allowedTools ?? null;
     this.approver = options.approver;
@@ -271,18 +295,44 @@ export class Gate {
       return this.internalError(name, spec, valid, exc, Approval.NOT_ASKED);
     }
 
+    // Identity phase I4: an operator who may not approve this write is refused before the
+    // prompt, so they're never asked.
+    if (spec.kind === ToolKind.WRITE && this.operator) {
+      const refusal = mayApprove(
+        this.ctx.directory,
+        this.operator.principal.sub,
+        this.ctx.requester,
+        valid.email as string,
+      );
+      if (refusal) {
+        return this.finish(
+          name,
+          spec,
+          valid,
+          Decision.DENIED_BY_POLICY,
+          `Refused by policy: ${refusal}`,
+          { error: true },
+        );
+      }
+    }
+
     let decision: Decision = Decision.ALLOWED;
     let approval: Approval = Approval.NOT_REQUIRED;
     let reason = `${spec.kind} tool on the allowlist; arguments valid`;
+    let runArgs: Args = valid;
+    let receiptToken: string | null = null;
+    let receipt: Receipt | null = null;
     if (spec.kind === ToolKind.WRITE) {
       let proposal: Proposal;
       let approved: boolean;
+      // What the operator sees is what runs: a frozen copy, and the receipt covers it.
+      const approvedArgs: Args = Object.freeze({ ...valid });
       try {
         if (spec.describe === undefined) throw new Error("write tool without describe");
         const target = valid.email as string;
         proposal = {
           tool: name,
-          args: { ...valid },
+          args: { ...approvedArgs },
           description: spec.describe(this.ctx, valid),
           requester: this.ctx.requester,
           target,
@@ -299,6 +349,33 @@ export class Gate {
           reason: "operator did not type y",
         });
       }
+      // The approval counts only from a verified operator who still passes the rules.
+      const approverRefusal = this.operator
+        ? mayApprove(
+            this.ctx.directory,
+            this.operator.principal.sub,
+            this.ctx.requester,
+            proposal.target,
+          )
+        : "the approval came with no verified approver";
+      if (approverRefusal || !this.operator) {
+        return this.finish(name, spec, valid, Decision.DENIED_BY_HUMAN, DENIED_BY_HUMAN, {
+          error: true,
+          approval: Approval.DENIED,
+          reason: `approval not honoured: ${approverRefusal}`,
+        });
+      }
+      try {
+        ({ token: receiptToken, receipt } = await this.receipts.sign(
+          this.operator.principal.sub,
+          this.ctx.ticketId,
+          name,
+          approvedArgs,
+        ));
+      } catch (exc) {
+        return this.internalError(name, spec, valid, exc, Approval.APPROVED);
+      }
+      runArgs = approvedArgs;
       decision = Decision.APPROVED;
       approval = Approval.APPROVED;
       reason = "passed policy checks; operator typed y";
@@ -311,6 +388,7 @@ export class Gate {
         tool: name,
         args: valid,
         effect: proposal.description,
+        ...receiptFields(receipt as Receipt),
       });
     }
 
@@ -328,7 +406,14 @@ export class Gate {
         if (exc instanceof TokenError) throw new GrantError(`exchange refused: ${exc.message}`);
         throw exc;
       }
-      const ran = await runWithGrant(spec, this.ctx, valid, token, this.signIn.resources);
+      const ran = await runWithGrant(
+        spec,
+        this.ctx,
+        runArgs,
+        token,
+        this.signIn.resources,
+        receiptToken === null ? null : { token: receiptToken, authority: this.receipts },
+      );
       [result, summary] = ran.result;
       grant = ran.grant;
     } catch (exc) {
