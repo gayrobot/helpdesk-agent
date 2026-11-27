@@ -4,6 +4,7 @@
 import { makeRealClient } from "../../src/worker/anthropic.ts";
 import { type Env, safeRoute } from "../../src/worker/routes.ts";
 import { sessionObjectClass } from "../../src/worker/session-object.ts";
+import { testTurnstile } from "./client.ts";
 
 export { Budget } from "../../src/worker/budget-object.ts";
 
@@ -13,5 +14,6 @@ export const HelpdeskSession = sessionObjectClass(makeRealClient, {
 });
 
 export default {
-  fetch: (request, env) => safeRoute(request, env, makeRealClient),
+  fetch: (request, env) =>
+    safeRoute(request, env, makeRealClient, { verifyTurnstile: testTurnstile }),
 } satisfies ExportedHandler<Env>;

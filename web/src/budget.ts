@@ -24,6 +24,12 @@ export interface BudgetLimits {
   askGlobal: number;
   /** New sessions per visitor per UTC day. */
   sessionsPerVisitor: number;
+  /** New sessions per UTC day across the site (tier 2). */
+  sessionsGlobal: number;
+  /** Demo tickets per visitor per UTC day, across all their sessions (tier 2). */
+  ticketsPerVisitor: number;
+  /** Demo tickets per UTC day across the site (tier 2). */
+  ticketsGlobal: number;
 }
 
 export const DEFAULT_LIMITS: BudgetLimits = {
@@ -31,6 +37,9 @@ export const DEFAULT_LIMITS: BudgetLimits = {
   askPerVisitor: 20,
   askGlobal: 400,
   sessionsPerVisitor: 20,
+  sessionsGlobal: 300,
+  ticketsPerVisitor: 16,
+  ticketsGlobal: 150,
 };
 
 export interface DayLedger {
@@ -41,6 +50,9 @@ export interface DayLedger {
   askByVisitor: Record<string, number>;
   sessionsByVisitor: Record<string, number>;
   reservations: Record<string, number>;
+  sessions: number;
+  tickets: number;
+  ticketsByVisitor: Record<string, number>;
 }
 
 export type Reservation = { ok: true; id: string } | { ok: false; reason: string };
@@ -58,6 +70,9 @@ const emptyDay = (date: string): DayLedger => ({
   askByVisitor: {},
   sessionsByVisitor: {},
   reservations: {},
+  sessions: 0,
+  tickets: 0,
+  ticketsByVisitor: {},
 });
 
 export class BudgetLedger {
@@ -74,7 +89,8 @@ export class BudgetLedger {
   private async today(): Promise<DayLedger> {
     const date = this.now().toISOString().slice(0, 10);
     const day = await this.store.load();
-    return day && day.date === date ? day : emptyDay(date);
+    // A ledger stored before tier 2 lacks the newer counters: start them at zero.
+    return day && day.date === date ? { ...emptyDay(date), ...day } : emptyDay(date);
   }
 
   /** Reserve `worstUsd` for one runbook question from `visitor`. */
@@ -108,6 +124,38 @@ export class BudgetLedger {
     return { ok: true, id };
   }
 
+  /** Reserve `worstUsd` for one demo ticket from `visitor` (tier 2). */
+  async reserveTicket(visitor: string, worstUsd: number): Promise<Reservation> {
+    if (!(worstUsd > 0)) return { ok: false, reason: "invalid reservation" };
+    const day = await this.today();
+    if (day.tickets >= this.limits.ticketsGlobal) {
+      return {
+        ok: false,
+        reason: "The demo has run its daily limit of tickets. Try again tomorrow.",
+      };
+    }
+    if ((day.ticketsByVisitor[visitor] ?? 0) >= this.limits.ticketsPerVisitor) {
+      return {
+        ok: false,
+        reason: "You've reached today's limit of demo tickets. Try again tomorrow.",
+      };
+    }
+    if (day.spentUsd + day.reservedUsd + worstUsd > this.limits.dailyUsd) {
+      return {
+        ok: false,
+        reason:
+          "The site has reached its spending limit for now (or other tickets are running). Try again later.",
+      };
+    }
+    const id = crypto.randomUUID();
+    day.tickets += 1;
+    day.ticketsByVisitor[visitor] = (day.ticketsByVisitor[visitor] ?? 0) + 1;
+    day.reservedUsd += worstUsd;
+    day.reservations[id] = worstUsd;
+    await this.store.save(day);
+    return { ok: true, id };
+  }
+
   /** Release a reservation and record what was really spent. Unknown ids are ignored. */
   async settle(id: string, actualUsd: number): Promise<void> {
     const day = await this.today();
@@ -123,7 +171,9 @@ export class BudgetLedger {
   /** May `visitor` create another session today? Counts it if so. */
   async allowSession(visitor: string): Promise<boolean> {
     const day = await this.today();
+    if (day.sessions >= this.limits.sessionsGlobal) return false;
     if ((day.sessionsByVisitor[visitor] ?? 0) >= this.limits.sessionsPerVisitor) return false;
+    day.sessions += 1;
     day.sessionsByVisitor[visitor] = (day.sessionsByVisitor[visitor] ?? 0) + 1;
     await this.store.save(day);
     return true;

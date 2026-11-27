@@ -14,39 +14,51 @@ let worker: Awaited<ReturnType<typeof startLocalWorker>>;
 let base: URL;
 const CONFIG = new URL("./worker/wrangler.test.jsonc", import.meta.url).pathname;
 
+// Fresh Durable Object state, so the site budget's daily session counts start at zero.
+const freshState = mkdtempSync(join(tmpdir(), "helpdesk-session-"));
+
 before(async () => {
-  worker = await startLocalWorker(0, CONFIG);
+  worker = await startLocalWorker(0, CONFIG, freshState);
   base = await worker.url;
 });
 
 after(async () => {
   await worker?.dispose();
+  rmSync(freshState, { recursive: true, force: true });
 });
 
 const origin = () => base.origin;
 
-async function newSession(headers: Record<string, string> = {}) {
+// The test build's Turnstile accepts only this token (test/worker/entry.ts).
+const HUMAN = JSON.stringify({ turnstile: "test-human" });
+
+async function newSession(headers: Record<string, string> = {}, body = HUMAN) {
   return fetch(new URL("/api/sessions", base), {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: origin(), ...headers },
-    body: "{}",
+    body,
   });
 }
+
+type Side = "requester" | "helpdesk";
 
 async function session() {
   const res = await newSession();
   assert.equal(res.status, 201);
   const { session: id, token } = (await res.json()) as { session: string; token: string };
+  const sides: Partial<Record<Side, string>> = {};
   const call = async (
     method: string,
     path: string,
     body?: unknown,
+    side?: Side,
     extra: Record<string, string> = {},
   ) => {
     const headers: Record<string, string> = {
       "X-Helpdesk-Session": id,
       "X-Helpdesk-Token": token,
       Origin: origin(),
+      ...(side && sides[side] ? { "X-Helpdesk-Identity": sides[side] as string } : {}),
       ...extra,
     };
     const init: RequestInit = { method, headers };
@@ -57,7 +69,12 @@ async function session() {
     const r = await fetch(new URL(path, base), init);
     return { status: r.status, data: (await r.json()) as Record<string, unknown> };
   };
-  return { id, token, call };
+  const signIn = async (side: Side, email: string) => {
+    const r = await call("POST", "/api/sign-in", { side, email });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    sides[side] = r.data.token as string;
+  };
+  return { id, token, call, signIn };
 }
 
 test("test_binds_to_loopback_only", () => {
@@ -74,7 +91,7 @@ test("test_page_carries_token_and_security_headers", async () => {
   assert.ok(csp.includes("script-src 'self'"));
   assert.ok(!csp.includes("unsafe-inline"));
   assert.equal(page.headers.get("x-content-type-options"), "nosniff");
-  assert.ok((await page.text()).includes("Helpdesk agent"));
+  assert.ok((await page.text()).includes("Helpdesk demo"));
   const created = await newSession();
   assert.equal(created.status, 201);
   assert.equal(created.headers.get("access-control-allow-origin"), null);
@@ -103,6 +120,9 @@ test("ts_sessions_are_created_only_from_this_page", async () => {
   });
   assert.equal(noOrigin.status, 403);
   assert.equal((await newSession({ "Content-Type": "text/plain" })).status, 400);
+  // No Turnstile token, or a wrong one: no session.
+  assert.equal((await newSession({}, "{}")).status, 403);
+  assert.equal((await newSession({}, JSON.stringify({ turnstile: "nope" }))).status, 403);
 });
 
 test("ts_unknown_session_or_wrong_token_is_refused", async () => {
@@ -123,40 +143,47 @@ test("ts_unknown_session_or_wrong_token_is_refused", async () => {
 
 test("ts_a_run_keeps_going_after_the_request_that_started_it", async () => {
   const s = await session();
-  const started = await s.call("POST", "/api/runs", {
-    requester: "jamie@example.test",
-    ticket: "Lost my phone, please reset my MFA",
-  });
+  await s.signIn("requester", "jamie@example.test");
+  await s.signIn("helpdesk", "theo.park@example.test");
+  const started = await s.call(
+    "POST",
+    "/api/runs",
+    { ticket: "Lost my phone, please reset my MFA" },
+    "requester",
+  );
   assert.equal(started.status, 202);
   const runId = started.data.run_id as string;
 
   // The POST has returned; the loop must still reach the write and wait for a click.
-  let snap = (await s.call("GET", `/api/runs/${runId}`)).data;
+  const view = async () => (await s.call("GET", `/api/runs/${runId}`, undefined, "helpdesk")).data;
+  let snap = await view();
   const deadline = Date.now() + 10_000;
   while (!snap.pending && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 50));
-    snap = (await s.call("GET", `/api/runs/${runId}`)).data;
+    snap = await view();
   }
   const pending = snap.pending as Record<string, unknown>;
   assert.equal(pending.tool, "reset_mfa");
   assert.equal(pending.requester_is_target, true);
+  const decide = (side: Side) =>
+    s.call(
+      "POST",
+      `/api/runs/${runId}/decision`,
+      { proposal_id: pending.id, decision: "approve" },
+      side,
+    );
 
+  // The requester's side can't approve, whatever the timing.
+  assert.equal((await decide("requester")).status, 403);
   // Too soon: the review delay (200 ms in the test build) refuses it.
-  const early = await s.call("POST", `/api/runs/${runId}/decision`, {
-    proposal_id: pending.id,
-    decision: "approve",
-  });
-  assert.equal(early.status, 409);
+  assert.equal((await decide("helpdesk")).status, 409);
   await new Promise((r) => setTimeout(r, 250));
-  const approved = await s.call("POST", `/api/runs/${runId}/decision`, {
-    proposal_id: pending.id,
-    decision: "approve",
-  });
+  const approved = await decide("helpdesk");
   assert.equal(approved.status, 200);
 
   while (snap.status === "running" && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 50));
-    snap = (await s.call("GET", `/api/runs/${runId}`)).data;
+    snap = await view();
   }
   assert.equal(snap.status, "answered");
   const events = snap.events as Record<string, unknown>[];
@@ -171,7 +198,10 @@ test("ts_a_run_keeps_going_after_the_request_that_started_it", async () => {
 
   // The session's own audit trail, stored in the Durable Object: the approval is recorded
   // before the write's tool_call record.
-  const log = (await s.call("GET", "/api/log")).data as { audit: Record<string, unknown>[] };
+  assert.equal((await s.call("GET", "/api/log", undefined, "requester")).status, 403);
+  const log = (await s.call("GET", "/api/log", undefined, "helpdesk")).data as {
+    audit: Record<string, unknown>[];
+  };
   assert.deepEqual(
     log.audit.map((r) => [r.event, r.tool, r.decision ?? null]),
     [
@@ -220,19 +250,31 @@ test("ts_restart_mid_proposal_comes_back_interrupted_with_no_write", async () =>
     const created = await fetch(new URL("/api/sessions", url), {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: url.origin },
-      body: "{}",
+      body: HUMAN,
     });
     const { session: id, token } = (await created.json()) as Record<string, string>;
-    const headers = () => ({
+    const sides: Record<string, string> = {};
+    const headers = (side = "helpdesk") => ({
       "X-Helpdesk-Session": id as string,
       "X-Helpdesk-Token": token as string,
+      "X-Helpdesk-Identity": sides[side] ?? "",
       Origin: url.origin,
       "Content-Type": "application/json",
     });
+    const signIn = async (side: string, email: string) => {
+      const r = await fetch(new URL("/api/sign-in", url), {
+        method: "POST",
+        headers: headers(side),
+        body: JSON.stringify({ side, email }),
+      });
+      sides[side] = ((await r.json()) as Record<string, string>).token as string;
+    };
+    await signIn("requester", "jamie@example.test");
+    await signIn("helpdesk", "rosa.delgado@example.test");
     const started = await fetch(new URL("/api/runs", url), {
       method: "POST",
-      headers: headers(),
-      body: JSON.stringify({ requester: "jamie@example.test", ticket: "reset my MFA" }),
+      headers: headers("requester"),
+      body: JSON.stringify({ ticket: "reset my MFA" }),
     });
     const { run_id: runId } = (await started.json()) as Record<string, string>;
     const deadline = Date.now() + 10_000;
@@ -249,6 +291,10 @@ test("ts_restart_mid_proposal_comes_back_interrupted_with_no_write", async () =>
     w = await startLocalWorker(0, CONFIG, state);
     url = await w.url;
     try {
+      // The sign-in key was in memory only: the old token is refused, so sign in again.
+      const stale = await fetch(new URL(`/api/runs/${runId}`, url), { headers: headers() });
+      assert.equal(stale.status, 401);
+      await signIn("helpdesk", "rosa.delgado@example.test");
       snap = (await (
         await fetch(new URL(`/api/runs/${runId}`, url), { headers: headers() })
       ).json()) as Record<string, unknown>;
@@ -314,10 +360,19 @@ test("ts_on_the_public_hostname_tier_2_is_off_and_ask_is_guarded", async () => {
   const json = { "Content-Type": "application/json", Origin: `http://${site}` };
   // The split-screen demo's API doesn't exist on the public hostname yet.
   assert.equal((await raw(site, "POST", "/api/sessions", json, "{}")).status, 404);
-  assert.equal(
-    (await raw(site, "GET", "/api/current", { "X-Helpdesk-Session": "0".repeat(64) })).status,
-    404,
-  );
+  // Nor does any route behind it, with or without a plausible session.
+  const sid = { "X-Helpdesk-Session": "0".repeat(64), "X-Helpdesk-Token": "t" };
+  for (const path of [
+    "/api/current",
+    "/api/requesters",
+    "/api/log",
+    "/api/runs/0123456789abcdef",
+  ]) {
+    assert.equal((await raw(site, "GET", path, sid)).status, 404, path);
+  }
+  for (const path of ["/api/sign-in", "/api/runs", "/api/runs/0123456789abcdef/decision"]) {
+    assert.equal((await raw(site, "POST", path, { ...json, ...sid }, "{}")).status, 404, path);
+  }
   // /api/ask without Cloudflare's visitor IP header, and without a Turnstile token.
   const question = JSON.stringify({ question: "How do I set up the VPN?" });
   assert.equal((await raw(site, "POST", "/api/ask", json, question)).status, 403);
@@ -339,7 +394,9 @@ test("ts_each_page_has_its_own_security_policy", async () => {
   const ask = await csp("/ask/");
   const demo = await csp("/demo/");
   assert.ok(!home.includes("challenges.cloudflare.com"));
-  assert.ok(!demo.includes("challenges.cloudflare.com"));
+  // The demo page runs Turnstile before a session is created.
+  assert.ok(demo.includes("script-src 'self' https://challenges.cloudflare.com"));
+  assert.equal(demo.split("Content-Security-Policy").length, 1);
   assert.ok(ask.includes("script-src 'self' https://challenges.cloudflare.com"));
   assert.ok(ask.includes("frame-src https://challenges.cloudflare.com"));
   assert.equal(ask.split("Content-Security-Policy").length, 1); // one policy, not two joined

@@ -96,6 +96,19 @@ export type Approver = (proposal: Proposal) => Promise<unknown> | unknown;
 /** Approver for evals and CI: every write is denied, so nothing is ever changed. */
 export const denyAll: Approver = async () => false;
 
+/**
+ * Tier 2: what an approver resolves to when the operator is chosen at click time. It names
+ * which of the gate's `operators` approved; the gate honours it only if that sign-in is one
+ * of them and still passes the approval rules.
+ */
+export class ApprovedBy {
+  readonly operator: SignIn;
+  constructor(operator: SignIn) {
+    this.operator = operator;
+    Object.freeze(this);
+  }
+}
+
 /** SHA-256 (hex) and UTF-8 length of a tool result, as recorded in the audit log. */
 export async function resultFingerprint(content: string): Promise<[string, number]> {
   const bytes = new TextEncoder().encode(content);
@@ -175,6 +188,12 @@ export interface GateOptions {
    * and CI use `denyAll`, which never approves).
    */
   operator?: SignIn | null;
+  /**
+   * Tier 2, instead of `operator`: the helpdesk personas who may answer, signed in. Which
+   * one approved is known only at the click, so the approver resolves to `ApprovedBy`. A
+   * write none of them may approve is refused before anyone is asked.
+   */
+  operators?: readonly SignIn[] | null;
   clock?: () => Date;
   /** Restrict the allowlist further (the anonymous tier allows only search_runbooks). */
   allowedTools?: ReadonlySet<string>;
@@ -202,6 +221,7 @@ export class Gate {
   readonly principal: Principal;
   private readonly signIn: SignIn;
   private readonly operator: SignIn | null;
+  private readonly operators: readonly SignIn[] | null;
   private readonly receipts: ReceiptAuthority;
   private readonly allowedTools: ReadonlySet<string> | null;
   private readonly approver: Approver;
@@ -220,6 +240,13 @@ export class Gate {
       throw new TypeError("the operator must be a SignIn from an issuer");
     }
     this.operator = options.operator ?? null;
+    if (options.operators != null) {
+      if (this.operator !== null) throw new TypeError("give operator or operators, not both");
+      if (!options.operators.every((o) => SignIn.is(o))) {
+        throw new TypeError("every operator must be a SignIn from an issuer");
+      }
+    }
+    this.operators = options.operators ? Object.freeze([...options.operators]) : null;
     this.receipts = new ReceiptAuthority();
     this.principal = options.signIn.principal;
     this.allowedTools = options.allowedTools ?? null;
@@ -297,13 +324,15 @@ export class Gate {
 
     // Identity phase I4: an operator who may not approve this write is refused before the
     // prompt, so they're never asked.
-    if (spec.kind === ToolKind.WRITE && this.operator) {
-      const refusal = mayApprove(
-        this.ctx.directory,
-        this.operator.principal.sub,
-        this.ctx.requester,
-        valid.email as string,
+    if (spec.kind === ToolKind.WRITE && (this.operator || this.operators)) {
+      const candidates = this.operator ? [this.operator] : (this.operators ?? []);
+      const refusals = candidates.map((o) =>
+        mayApprove(this.ctx.directory, o.principal.sub, this.ctx.requester, valid.email as string),
       );
+      // Refused only when nobody who could answer may approve it.
+      const refusal = refusals.every((r) => r !== null)
+        ? refusals.join(" ") || "nobody here may approve writes."
+        : null;
       if (refusal) {
         return this.finish(
           name,
@@ -325,6 +354,7 @@ export class Gate {
     if (spec.kind === ToolKind.WRITE) {
       let proposal: Proposal;
       let approved: boolean;
+      let approvedBy: SignIn | null = null;
       // What the operator sees is what runs: a frozen copy, and the receipt covers it.
       const approvedArgs: Args = Object.freeze({ ...valid });
       try {
@@ -338,7 +368,16 @@ export class Gate {
           target,
           requesterIsTarget: normalize(this.ctx.requester) === normalize(target),
         };
-        approved = (await this.approver(proposal)) === true;
+        const answer = await this.approver(proposal);
+        if (answer instanceof ApprovedBy) {
+          approved = true;
+          // Only one of this gate's own operators counts; anything else has no verified
+          // approver and is not honoured below.
+          approvedBy = this.operators?.includes(answer.operator) ? answer.operator : null;
+        } else {
+          approved = answer === true;
+          approvedBy = this.operators ? null : this.operator;
+        }
       } catch (exc) {
         return this.internalError(name, spec, valid, exc, Approval.NOT_ASKED);
       }
@@ -350,15 +389,15 @@ export class Gate {
         });
       }
       // The approval counts only from a verified operator who still passes the rules.
-      const approverRefusal = this.operator
+      const approverRefusal = approvedBy
         ? mayApprove(
             this.ctx.directory,
-            this.operator.principal.sub,
+            approvedBy.principal.sub,
             this.ctx.requester,
             proposal.target,
           )
         : "the approval came with no verified approver";
-      if (approverRefusal || !this.operator) {
+      if (approverRefusal || !approvedBy) {
         return this.finish(name, spec, valid, Decision.DENIED_BY_HUMAN, DENIED_BY_HUMAN, {
           error: true,
           approval: Approval.DENIED,
@@ -367,7 +406,7 @@ export class Gate {
       }
       try {
         ({ token: receiptToken, receipt } = await this.receipts.sign(
-          this.operator.principal.sub,
+          approvedBy.principal.sub,
           this.ctx.ticketId,
           name,
           approvedArgs,

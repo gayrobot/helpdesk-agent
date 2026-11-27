@@ -1,0 +1,31 @@
+// Test build only (short session lifetime): test/worker-cleanup.test.ts. Never deployed.
+{
+  "name": "helpdesk-agent-test-ttl",
+  "main": "entry-ttl.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "send_metrics": false,
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "../../public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "SESSIONS", "class_name": "HelpdeskSession" },
+      { "name": "BUDGET", "class_name": "Budget" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession", "Budget"] }],
+  // Test values only: Cloudflare's always-pass Turnstile test secret, model calls on.
+  "vars": {
+    "MODEL_CALLS": "on",
+    "TURNSTILE_SECRET": "1x0000000000000000000000000000000AA",
+    "VISITOR_SALT": "test",
+    "SITE_HOSTNAME": "demo.example.test",
+    "TURNSTILE_SITEKEY": "test-sitekey"
+  }
+}

@@ -20,14 +20,20 @@
  * - State is persisted through a `SessionStore`. If the process restarts mid-run, the run
  *   is marked interrupted and any pending write counts as denied: nothing resumes.
  */
-import { Agent } from "./agent.ts";
+import { Agent, MAX_TOOL_TURNS } from "./agent.ts";
 import type { AuditSink } from "./audit.ts";
 import { buildRecord, GENESIS, HashChain } from "./audit.ts";
-import { type CallLog, type MessagesClient, ModelCaller } from "./client.ts";
+import { mayApprove } from "./authz.ts";
+import {
+  type CallLog,
+  type MessagesClient,
+  ModelCaller,
+  type ModelCallerOptions,
+} from "./client.ts";
 import type { RawDirectory } from "./data.ts";
 import { Directory } from "./directory.ts";
-import { EMAIL_PATTERN, Gate, type Outcome, type Proposal } from "./governance.ts";
-import { DevIssuer } from "./identity.ts";
+import { ApprovedBy, EMAIL_PATTERN, Gate, type Outcome, type Proposal } from "./governance.ts";
+import { DevIssuer, type SignIn } from "./identity.ts";
 import { pyLen } from "./pycompat.ts";
 import { display, type EscalationRecord, type Retriever } from "./tools.ts";
 
@@ -65,12 +71,23 @@ export interface StoredRun {
   final_text: string;
   tool_turns: number;
   events: Record<string, unknown>[];
+  /** What this run's model calls cost in US dollars; null if any call's cost was unknown. */
+  cost_usd?: number | null;
+  /** Tier 2: the budget reservation this run holds until it is settled. */
+  reservation_id?: string | null;
 }
 
 interface Pending {
   id: string;
   fields: Record<string, unknown>;
+  /** Raw (not display) requester and target, for the approval rules at the click. */
+  requester: string;
+  target: string;
   decision: boolean | null;
+  /** Tier 2: who clicked Approve, once an Approve passed the rules. */
+  approver: string | null;
+  /** Tier 2: Approve clicks refused at the click, with the rule that refused each. */
+  refusals: { approver: string; rule: string }[];
   shownAt: number | null;
   resolve: () => void;
 }
@@ -96,7 +113,17 @@ export interface SessionOptions {
    * the request or own the account being changed.
    */
   operator?: string;
+  /**
+   * Tier 2, instead of `operator`: the helpdesk personas who may answer. Each Approve
+   * names who clicked it (`decideAs`), and the approval rules run at that click.
+   */
+  operators?: readonly string[];
+  /** Model settings for this session's tickets (the public demo caps output tokens). */
+  modelOptions?: ModelCallerOptions;
+  maxToolTurns?: number;
 }
+
+export type DecideResult = { ok: true } | { ok: false; refusal: string | null };
 
 /** The local page's approver until tier 2 lets the page switch helpdesk personas. */
 export const DEFAULT_OPERATOR = "theo.park@example.test";
@@ -147,7 +174,17 @@ export class Session {
   readonly requesters: { email: string; name: string }[];
   private readonly known: Set<string>;
   private readonly opts: Required<
-    Omit<SessionOptions, "client" | "store" | "retriever" | "issuer" | "operator">
+    Omit<
+      SessionOptions,
+      | "client"
+      | "store"
+      | "retriever"
+      | "issuer"
+      | "operator"
+      | "operators"
+      | "modelOptions"
+      | "maxToolTurns"
+    >
   > &
     SessionOptions;
   private directory: Directory;
@@ -200,7 +237,7 @@ export class Session {
 
   // ------------------------------------------------------------ runs
 
-  async startRun(requester: unknown, body: unknown): Promise<Run> {
+  async startRun(requester: unknown, body: unknown, reservationId?: string): Promise<Run> {
     if (typeof requester !== "string" || !this.known.has(requester)) {
       throw new BadRequest("Pick a requester from the list.");
     }
@@ -219,6 +256,7 @@ export class Session {
       tool_turns: 0,
       events: [],
       pending: null,
+      reservation_id: reservationId ?? null,
     };
     this.runs.set(run.id, run);
     this.current = run;
@@ -233,23 +271,32 @@ export class Session {
       // identity from a stored email.
       this.issuer ??= this.opts.issuer ?? new DevIssuer();
       const signIn = await this.issuer.signIn(run.requester);
-      const operator = await this.issuer.signIn(this.opts.operator ?? DEFAULT_OPERATOR);
+      const pool = new Map<string, SignIn>();
+      for (const email of this.opts.operators ?? []) {
+        pool.set(email, await this.issuer.signIn(email));
+      }
+      const operator = this.opts.operators
+        ? null
+        : await this.issuer.signIn(this.opts.operator ?? DEFAULT_OPERATOR);
       const staged: Record<string, unknown>[] = [];
       const gate = new PanelGate({
         directory: this.directory,
-        approver: (p) => this.approve(run, p),
+        approver: (p) => this.approve(run, p, this.opts.operators ? pool : null),
         audit: this.auditFor(staged),
         escalations: { save: (r) => this.opts.store.saveEscalation(r) },
         retriever: this.opts.retriever,
         ticketId: run.ticket_id,
         signIn,
-        operator,
+        ...(this.opts.operators ? { operators: [...pool.values()] } : { operator }),
         clock: this.opts.clock,
       });
       gate.run = run;
       gate.staged = staged;
-      const caller = new ModelCaller(this.opts.client, this.callLog());
-      const result = await new Agent(caller, gate).run(body);
+      run.cost_usd = 0;
+      const caller = new ModelCaller(this.opts.client, this.callLog(run), this.opts.modelOptions);
+      const result = await new Agent(caller, gate, this.opts.maxToolTurns ?? MAX_TOOL_TURNS).run(
+        body,
+      );
       run.final_text = result.final_text;
       run.tool_turns = result.tool_turns;
       run.status = result.status;
@@ -302,13 +349,29 @@ export class Session {
     };
   }
 
-  private callLog(): CallLog {
-    return { write: (entry) => this.opts.store.appendCall(entry) };
+  private callLog(run: Run): CallLog {
+    return {
+      write: (entry) => {
+        // Unknown cost (an unpriced model, a failed call) makes the run's cost unknown,
+        // which the budget settles as the full reservation.
+        const cost = entry.cost_usd;
+        if (typeof cost === "number" && Number.isFinite(cost) && typeof run.cost_usd === "number") {
+          run.cost_usd += cost;
+        } else if (cost !== undefined && cost !== 0) {
+          run.cost_usd = null;
+        }
+        return this.opts.store.appendCall(entry);
+      },
+    };
   }
 
-  private approve(run: Run, proposal: Proposal): Promise<boolean> {
+  private approve(
+    run: Run,
+    proposal: Proposal,
+    pool: ReadonlyMap<string, SignIn> | null,
+  ): Promise<boolean | ApprovedBy> {
     if (this.closed) return Promise.resolve(false);
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean | ApprovedBy>((resolve) => {
       const pending: Pending = {
         id: randomHex(24),
         fields: {
@@ -319,7 +382,11 @@ export class Session {
           target: safe(proposal.target),
           requester_is_target: proposal.requesterIsTarget,
         },
+        requester: proposal.requester,
+        target: proposal.target,
         decision: null,
+        approver: null,
+        refusals: [],
         shownAt: null,
         resolve: () => {},
       };
@@ -329,7 +396,11 @@ export class Session {
         run.pending = null;
         // Only an Approve recorded for this proposal's id counts. No decision (timeout,
         // shutdown) or a Deny both deny.
-        resolve(pending.decision === true);
+        if (pending.decision !== true) return resolve(false);
+        if (!pool) return resolve(true);
+        // Tier 2: name who approved; the gate checks the rules again before honouring it.
+        const by = pending.approver === null ? undefined : pool.get(pending.approver);
+        resolve(by ? new ApprovedBy(by) : false);
       };
       run.pending = pending;
     });
@@ -350,13 +421,129 @@ export class Session {
     return true;
   }
 
+  /**
+   * Tier 2: one decision from a named helpdesk persona. An Approve the approval rules
+   * refuse (the persona filed the request, or is its target) is not recorded: the proposal
+   * stays pending for someone who may approve it, and the refusal is audited and shown.
+   */
+  async decideAs(
+    runId: string,
+    proposalId: unknown,
+    approve: boolean,
+    approver: string,
+  ): Promise<DecideResult> {
+    const run = this.runs.get(runId);
+    const pending = run?.pending;
+    if (!run || !pending || pending.decision !== null || typeof proposalId !== "string") {
+      return { ok: false, refusal: null };
+    }
+    if (!timingSafeEqual(pending.id, proposalId)) return { ok: false, refusal: null };
+    if (!(this.opts.operators ?? []).includes(approver)) {
+      return { ok: false, refusal: `${approver} is not one of this demo's helpdesk personas.` };
+    }
+    if (approve) {
+      const rule = mayApprove(this.directory, approver, pending.requester, pending.target);
+      if (rule) {
+        // Recorded once per approver per proposal, however often they click.
+        if (pending.refusals.some((r) => r.approver === safe(approver))) {
+          return { ok: false, refusal: rule };
+        }
+        pending.refusals.push({ approver: safe(approver), rule: safe(rule) });
+        await this.auditFor([]).record("approval_refused", {
+          ticket_id: run.ticket_id,
+          requester: pending.requester,
+          approver,
+          tool: pending.fields.tool,
+          target: pending.target,
+          reason: rule,
+        });
+        return { ok: false, refusal: rule };
+      }
+      const shown = pending.shownAt;
+      if (shown === null || this.opts.now() - shown < this.opts.minReviewMs) {
+        return { ok: false, refusal: null };
+      }
+      pending.approver = approver;
+    }
+    pending.decision = approve;
+    pending.resolve();
+    return { ok: true };
+  }
+
+  /**
+   * Tier 2: finished runs whose budget reservation hasn't been settled (a restart
+   * interrupted them), with their cost summed from the stored call log: null when a
+   * call's cost is unknown, which settles as the whole reservation.
+   */
+  async unsettled(): Promise<{ runId: string; reservationId: string; costUsd: number | null }[]> {
+    const open = [...this.runs.values()].filter((r) => r.reservation_id && r.status !== "running");
+    if (open.length === 0) return [];
+    const { calls } = await this.opts.store.readLog();
+    return open.map((run) => {
+      let cost: number | null = 0;
+      for (const c of calls) {
+        if (c.event !== "model_call" || c.ticket_id !== run.ticket_id) continue;
+        if (c.cost_usd === undefined) continue; // a failed call: not billed
+        cost = typeof c.cost_usd === "number" && cost !== null ? cost + c.cost_usd : null;
+      }
+      return { runId: run.id, reservationId: run.reservation_id as string, costUsd: cost };
+    });
+  }
+
+  /** Tier 2: the run's reservation has been settled; forget it. */
+  async markSettled(runId: string): Promise<void> {
+    const run = this.runs.get(runId);
+    if (!run?.reservation_id) return;
+    run.reservation_id = null;
+    await this.persistRuns();
+  }
+
+  /** Who filed a run, or null for an unknown run. */
+  runRequester(runId: string): string | null {
+    return this.runs.get(runId)?.requester ?? null;
+  }
+
+  /** The run's model cost so far (null if unknown), or undefined for an unknown run. */
+  runCost(runId: string): number | null | undefined {
+    const run = this.runs.get(runId);
+    return run ? (run.cost_usd ?? null) : undefined;
+  }
+
+  /** How many tickets this session has started (the stored history holds up to 20). */
+  get ticketCount(): number {
+    return this.runs.size;
+  }
+
+  /** True while a ticket is running (or the session is shutting down). */
+  isBusy(): boolean {
+    return this.closed || this.current?.status === "running";
+  }
+
+  /** A run's state without its proposal, and without marking a proposal as shown. */
+  peek(runId: string): Record<string, unknown> | null {
+    const run = this.runs.get(runId);
+    if (!run) return null;
+    return {
+      run_id: run.id,
+      ticket_id: run.ticket_id,
+      requester: run.requester,
+      status: run.status,
+      final_text: run.final_text,
+      tool_turns: run.tool_turns,
+    };
+  }
+
   snapshot(runId: string): Record<string, unknown> | null {
     const run = this.runs.get(runId);
     if (!run) return null;
     let pending = null;
     if (run.pending && run.pending.decision === null) {
       run.pending.shownAt ??= this.opts.now();
-      pending = { id: run.pending.id, ...run.pending.fields };
+      pending = {
+        id: run.pending.id,
+        ...run.pending.fields,
+        refusals: run.pending.refusals.map((r) => ({ ...r })),
+      };
     }
     return {
       run_id: run.id,

@@ -3,62 +3,136 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Helpdesk agent (Worker, local)</title>
+  <title>Helpdesk demo</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/demo/app.js" defer></script>
 </head>
-<body>
+<body class="demo-page">
+  <div class="banner" role="note">Proof of concept. Larkspur Labs is a fictional company and every person, device and runbook here is invented. Don't enter real details.</div>
   <header>
-    <h1>Helpdesk agent</h1>
-    <p class="note">Local only. Larkspur Labs is fictional; every user and device here is synthetic.</p>
+    <h1>Helpdesk demo <span class="badge sim">simulated sign-in</span></h1>
+    <p class="note">One visitor drives both sides. The left is signed in as a requester, the right as a helpdesk persona, each with its own token, so the server knows which side every click comes from. That proves the rule (whoever approves is not whoever asked), not that two people were involved. <a href="/">Back to the overview</a></p>
   </header>
 
   <main>
-    <section class="card" aria-labelledby="ticket-heading">
-      <h2 id="ticket-heading">New ticket</h2>
-      <label for="requester">Requester</label>
-      <select id="requester" required></select>
-      <label for="ticket">Ticket</label>
-      <textarea id="ticket" rows="5" maxlength="8000" placeholder="Describe the problem"></textarea>
+    <section id="start" class="card" aria-labelledby="start-heading">
+      <h2 id="start-heading">Start a demo session</h2>
+      <p class="meta">A session lasts about a day after its last use, then its storage is deleted. Each session can run <span id="ticket-cap">8</span> tickets.</p>
+      <div id="turnstile"></div>
       <div class="row">
-        <button id="send" type="button">Run ticket</button>
-        <span id="form-status" role="status"></span>
+        <button id="start-btn" type="button" disabled>Start the demo</button>
+        <span id="start-status" role="status"></span>
       </div>
     </section>
 
-    <section id="approval" class="card approval" hidden aria-live="assertive" aria-labelledby="approval-heading">
-      <h2 id="approval-heading">Approval required</h2>
-      <dl>
-        <dt>Tool</dt><dd id="p-tool"></dd>
-        <dt>Arguments</dt><dd><pre id="p-args"></pre></dd>
-        <dt>Effect</dt><dd id="p-effect"></dd>
-        <dt>Requester</dt><dd id="p-requester"></dd>
-        <dt>Target</dt><dd id="p-target"></dd>
+    <div id="demo" hidden>
+      <div class="side-toggle" role="tablist" aria-label="Which side to show">
+        <button id="show-left" type="button" role="tab" aria-selected="true" aria-controls="left">Requester</button>
+        <button id="show-right" type="button" role="tab" aria-selected="false" aria-controls="right">Helpdesk</button>
+      </div>
+      <div class="split">
+        <div id="left" class="side" data-active="true" aria-labelledby="left-heading">
+          <h2 id="left-heading" class="side-title">Requester</h2>
+          <section class="card">
+            <label for="requester">Signed in as <span class="badge sim">simulated sign-in</span></label>
+            <select id="requester"></select>
+            <p id="left-who" class="meta"></p>
+            <label for="ticket-left">Ticket</label>
+            <textarea id="ticket-left" rows="4" maxlength="8000" placeholder="For example: I got a new phone and can't get past MFA."></textarea>
+            <div class="row">
+              <button id="send-left" type="button">Send ticket</button>
+              <span id="left-status" role="status"></span>
+            </div>
+          </section>
+          <section class="card" aria-labelledby="left-reply-heading">
+            <h2 id="left-reply-heading">Reply <span id="left-run-status" class="badge"></span></h2>
+            <p id="left-meta" class="meta"></p>
+            <div id="left-reply" class="reply"></div>
+            <p id="left-source" class="source" hidden></p>
+          </section>
+          <p class="meta">The requester sees the reply only. Proposals, tool results and the audit trail are on the helpdesk side, and this side can't approve anything.</p>
+        </div>
+
+        <div id="right" class="side" data-active="false" aria-labelledby="right-heading">
+          <h2 id="right-heading" class="side-title">Helpdesk (it-support)</h2>
+          <section class="card">
+            <fieldset class="personas">
+              <legend>Signed in as <span class="badge sim">simulated sign-in</span></legend>
+              <div id="helpdesk-personas"></div>
+            </fieldset>
+            <p id="right-who" class="meta"></p>
+            <label for="ticket-right">File a ticket as the helpdesk</label>
+            <textarea id="ticket-right" rows="3" maxlength="8000" placeholder="For example: Please reset MFA for jamie@example.test, they lost their phone."></textarea>
+            <div class="row">
+              <button id="send-right" type="button">Send ticket</button>
+              <span id="right-status" role="status"></span>
+            </div>
+          </section>
+
+          <section id="approval" class="card approval" hidden aria-live="assertive" aria-labelledby="approval-heading">
+            <h2 id="approval-heading">Approval required</h2>
+            <dl>
+              <dt>Tool</dt><dd id="p-tool"></dd>
+              <dt>Arguments</dt><dd><pre id="p-args"></pre></dd>
+              <dt>Effect</dt><dd><span id="p-effect"></span> <span class="sim-note">(simulated: changes this demo's copy only)</span></dd>
+              <dt>Requester</dt><dd id="p-requester"></dd>
+              <dt>Target</dt><dd id="p-target"></dd>
+              <dt>Approving as</dt><dd id="p-approver"></dd>
+            </dl>
+            <p id="p-match"></p>
+            <ul id="p-refusals" class="refusals"></ul>
+            <div class="row">
+              <button id="approve" type="button" class="approve">Approve this write</button>
+              <button id="deny" type="button" class="deny">Deny</button>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="right-run-heading">
+            <h2 id="right-run-heading">Current ticket <span id="right-run-status" class="badge"></span></h2>
+            <p id="right-meta" class="meta">None yet.</p>
+            <div id="right-reply" class="reply"></div>
+          </section>
+
+          <section class="card" aria-labelledby="calls-heading">
+            <h2 id="calls-heading">Tool calls</h2>
+            <table>
+              <colgroup>
+                <col class="c-num"><col class="c-tool"><col class="c-args"><col class="c-decision"><col class="c-reason">
+              </colgroup>
+              <thead><tr><th>#</th><th>Tool</th><th>Arguments</th><th>Decision</th><th>Reason</th></tr></thead>
+              <tbody id="calls"></tbody>
+            </table>
+            <p id="no-calls" class="meta">None yet.</p>
+          </section>
+
+          <section class="card" aria-labelledby="audit-heading">
+            <h2 id="audit-heading">Audit trail</h2>
+            <p class="meta">This session's records, each linked by hash to the one before. Newest last.</p>
+            <ol id="audit" class="audit"></ol>
+            <button id="refresh-audit" type="button" class="secondary">Refresh</button>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" aria-labelledby="try-heading">
+      <h2 id="try-heading">Things to try</h2>
+      <ul>
+        <li>As Jamie on the left, ask for your own MFA reset. Approve it on the right.</li>
+        <li>As Jamie, ask to reset Priya's MFA. It's refused before the helpdesk is asked: Jamie isn't Priya or her manager.</li>
+        <li>As Theo on the right, ask the agent to reset MFA for an ordinary user. Theo's own Approve is refused (nobody approves their own request); switch to Rosa and approve.</li>
+        <li>Ask for a reset on a privileged account, or to add someone to an admin group. The agent can't: the call is refused in code, and the tool-call panel shows which rule refused it.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>What's real and what's simulated</h2>
+      <dl class="real">
+        <dt>Real</dt>
+        <dd>The model (Claude), the governance code that decides what runs, the per-call tokens and approval receipts, the audit trail, and the evaluation results.</dd>
+        <dt>Simulated</dt>
+        <dd>Larkspur Labs, its people, directory, devices and runbooks, and the sign-in: both sides sign in through a development token issuer, not a real identity provider. "Reset MFA" changes a flag in this session's own copy of the directory and nothing else.</dd>
       </dl>
-      <p id="p-match"></p>
-      <div class="row">
-        <button id="approve" type="button" class="approve">Approve this write</button>
-        <button id="deny" type="button" class="deny">Deny</button>
-      </div>
-    </section>
-
-    <section class="card" aria-labelledby="reply-heading">
-      <h2 id="reply-heading">Reply <span id="run-status" class="badge"></span></h2>
-      <p id="run-meta" class="meta"></p>
-      <div id="reply" class="reply"></div>
-      <p id="source" class="source" hidden></p>
-    </section>
-
-    <section class="card" aria-labelledby="calls-heading">
-      <h2 id="calls-heading">Tool calls</h2>
-      <table>
-        <colgroup>
-          <col class="c-num"><col class="c-tool"><col class="c-args"><col class="c-decision"><col class="c-reason">
-        </colgroup>
-        <thead><tr><th>#</th><th>Tool</th><th>Arguments</th><th>Decision</th><th>Reason</th></tr></thead>
-        <tbody id="calls"></tbody>
-      </table>
-      <p id="no-calls" class="meta">None yet.</p>
     </section>
   </main>
 </body>
