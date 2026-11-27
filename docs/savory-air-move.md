@@ -101,6 +101,14 @@ Each step is a PR unless marked otherwise. The live site isn't redeployed until 
 | 4 | **Redeploy** `hddemo.damiano.dev` from the merged, green `main` | The site shows Savory Air. Sessions created before the deploy expire within 24 hours (alarm cleanup). |
 | 5 | **Resume I5** (PR #43 and onward): the Okta subset and seeding | See "Okta" below |
 
+## Results (2026-11-27)
+
+Step 3 ran on the data PR's branch, before merge.
+- **Python, the new baseline of record:** [`2026-11-27T203630Z.json`](../evals/results/2026-11-27T203630Z.json), `eval --grade`. 62/62, every category 100%. Grader 9/14, the same as the Larkspur baseline (answers_question 12/14, grounded 9/14, no_contradiction 14/14). $0.610 agent + $0.0035 grader, $0.0098 per ticket, 277 s.
+- **TypeScript:** [`ts-2026-11-27T204129Z.json`](../evals/results/ts-2026-11-27T204129Z.json), `--grade`. 62/62, grader 9/14 (answers_question 13/14). `scripts/compare_results.py` against the Python run: parity bar items 2 and 4 met.
+  - **Cost:** $0.0048 per ticket, half of Python's. The two runs made about the same number of calls (165 and 167). The TypeScript run started minutes after the Python run with identical prompts, so it mostly read the prompt cache Python had written: 372k cached tokens read and 38k written, against Python's 263k read and 181k written (`logs/`). That's run order, not a code difference. Don't quote it as a TypeScript saving.
+- **Retrieval (key-free):** BM25 recall@3 0.974 and MRR 0.891 in both languages, unchanged from Larkspur.
+
 ## Okta: the shared subset
 
 The Okta tenant holds only the personas a live demo needs, not the whole directory.
