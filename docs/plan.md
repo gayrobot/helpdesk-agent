@@ -152,7 +152,7 @@ Decided 2026-11-25 (Skylar). The site is a proof of concept for reviewers, not a
 - **Limits, before any model call:**
   - `MODEL_CALLS`
   - 8 tickets per session
-  - a budget reservation for each ticket's worst case: 16 tickets per visitor and 150 for the site per day, under the shared $2 daily cap
+  - a budget reservation for each ticket's worst case: 16 tickets per visitor and 150 for the site per day, under the shared daily dollar cap ($5 on the site since 2026-11-27, set by `BUDGET_DAILY_USD` in `wrangler.jsonc`; the code default is $2)
   - for new sessions: Turnstile, then 20 per visitor and 300 for the site per day
 - **Ticket cost:** demo tickets cap output at 2,000 tokens with no refusal fallback, so the reserved worst case is $0.855. A live measurement on 2026-11-27 came to about $0.01 per ticket.
 - **Recovery:** a run interrupted by a restart is settled from its stored call log when the session reopens.
