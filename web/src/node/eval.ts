@@ -1,5 +1,8 @@
 /**
- * `npm run eval -- [--limit N] [--category C]... [--grade] [--dry-run] [--tickets PATH]`
+ * `npm run eval -- [--limit N] [--category C]... [--grade] [--demo] [--dry-run] [--tickets PATH]`
+ *
+ * `--demo` runs with the public demo's model settings (src/demo.ts: 2,000 output tokens,
+ * no refusal fallback), to measure what a demo ticket really costs.
  *
  * Runs the TypeScript agent over evals/tickets.jsonl with every write auto-denied, the
  * same way `helpdesk-agent eval` runs the Python one. Live runs need the key, which only
@@ -9,12 +12,13 @@
  * Results go to evals/results/ts-<UTC time>.json (summary.implementation is
  * "typescript"); the call and audit logs go to logs/ts/, apart from Python's.
  */
+
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-
 import type { MessagesClient } from "../client.ts";
+import { DEMO_MODEL_OPTIONS } from "../demo.ts";
 import { CollectingCallLog, formatSummary, parseTickets, runTickets } from "../evals.ts";
 import { formatGraderSummary, Grader } from "../grader.ts";
 import { MemoryEscalations } from "../memory.ts";
@@ -54,6 +58,7 @@ export async function main(argv: string[], deps: EvalDeps = {}): Promise<number>
       category: { type: "string", multiple: true },
       limit: { type: "string" },
       grade: { type: "boolean", default: false },
+      demo: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
     },
   });
@@ -91,6 +96,7 @@ export async function main(argv: string[], deps: EvalDeps = {}): Promise<number>
     escalations: new MemoryEscalations(), // discarded, as Python's temp directory is
     retriever: defaultAclRetriever(),
     grader,
+    ...(values.demo ? { modelOptions: DEMO_MODEL_OPTIONS } : {}),
     onTicket: (ticket, score) => {
       const failed = Object.entries(score.checks)
         .filter(([, v]) => v === false)
@@ -100,8 +106,9 @@ export async function main(argv: string[], deps: EvalDeps = {}): Promise<number>
     },
   });
   results.summary.implementation = "typescript";
+  if (values.demo) results.summary.model_settings = "demo";
 
-  const file = `evals/results/ts-${stamp((deps.now ?? (() => new Date()))())}.json`;
+  const file = `evals/results/ts-${values.demo ? "demo-" : ""}${stamp((deps.now ?? (() => new Date()))())}.json`;
   mkdirSync(at("evals/results"), { recursive: true });
   writeFileSync(at(file), `${JSON.stringify(results, null, 2)}\n`);
 

@@ -17,7 +17,12 @@
  */
 import { Agent, type AgentResult } from "./agent.ts";
 import type { AuditSink } from "./audit.ts";
-import { type CallLog, type MessagesClient, ModelCaller } from "./client.ts";
+import {
+  type CallLog,
+  type MessagesClient,
+  ModelCaller,
+  type ModelCallerOptions,
+} from "./client.ts";
 import { Directory } from "./directory.ts";
 import { Decision, denyAll, Gate } from "./governance.ts";
 import { expectedRunbooks, GRADED_STATUSES, type Grader, summarizeGrades } from "./grader.ts";
@@ -209,6 +214,8 @@ export interface RunOptions {
   grader?: Grader | null;
   /** Mints each ticket's requester token (identity phase I1). A new one per run if absent. */
   issuer?: DevIssuer;
+  /** Model settings (`--demo` uses the public demo's: capped output, no fallback). */
+  modelOptions?: ModelCallerOptions;
   onTicket?: (ticket: Ticket, score: TicketScore) => void;
 }
 
@@ -244,7 +251,9 @@ export async function runTickets(
       signIn,
     });
     const start = log.entries.length;
-    const result = await new Agent(new ModelCaller(client, log), gate).run(ticket.body);
+    const result = await new Agent(new ModelCaller(client, log, options.modelOptions), gate).run(
+      ticket.body,
+    );
     const calls = log.entries.slice(start);
     const transcript = JSON.parse(JSON.stringify(result)) as AgentResult;
     const score = scoreTranscript(ticket, transcript);
