@@ -3,8 +3,9 @@
  * reaches here.
  *
  * Public (tier 1): GET /api/config, GET /api/health, POST /api/ask.
- * Local only until tier 2 ships (it needs identity phases I2-I4): POST /api/sessions and
- * the session API forwarded to each session's Durable Object.
+ * Tier 2 (the split-screen demo): POST /api/sessions, and the session API in
+ * `TIER2_ROUTES` forwarded to each session's Durable Object. Public only while
+ * `TIER2_PUBLIC` is true; any other /api/ path is 404 on the public hostname.
  */
 import { hostOk, isLocal, json, originOk, readJson, SESSION_HEADER, tokenHash } from "../api.ts";
 import { type AskResult, askRunbooks, handleAsk } from "../ask.ts";
@@ -12,15 +13,18 @@ import type { Reservation } from "../budget.ts";
 import { visitorKey } from "../budget.ts";
 import { bundledAclRetriever, bundledChunks } from "../bundled.ts";
 import type { MessagesClient } from "../client.ts";
+import { handleNewSession } from "../demo.ts";
 import { Directory } from "../directory.ts";
 import { DevIssuer } from "../identity.ts";
 import { BadRequest } from "../session.ts";
 import { verifyTurnstile } from "../turnstile.ts";
 import { BUDGET_NAME } from "./budget-object.ts";
 
-interface BudgetRpc {
+export interface BudgetRpc {
   reserveAsk(visitor: string, worstUsd: number): Promise<Reservation>;
+  reserveTicket(visitor: string, worstUsd: number): Promise<Reservation>;
   settle(id: string, actualUsd: number): Promise<void>;
+  allowSession(visitor: string): Promise<boolean>;
 }
 
 export interface Env {
@@ -38,6 +42,27 @@ export interface Env {
   VISITOR_SALT?: string;
 }
 
+/**
+ * Whether tier 2 is open on the public hostname. Locally it always is. Opening it is its
+ * own change, after the demo's limits and labels are in place.
+ */
+export const TIER2_PUBLIC = false;
+
+/** The session API paths a public request may reach (anything else under /api/ is 404). */
+const TIER2_ROUTES: readonly RegExp[] = [
+  /^\/api\/sign-in$/,
+  /^\/api\/requesters$/,
+  /^\/api\/current$/,
+  /^\/api\/log$/,
+  /^\/api\/runs$/,
+  /^\/api\/runs\/[0-9a-f]{16}$/,
+  /^\/api\/runs\/[0-9a-f]{16}\/decision$/,
+];
+export const isTier2Route = (path: string) => TIER2_ROUTES.some((r) => r.test(path));
+
+/** Set by this Worker on requests it forwards to a session; a visitor's own is dropped. */
+export const VISITOR_HEADER = "X-Helpdesk-Visitor";
+
 /** Cloudflare's always-pass test site key, used only on loopback hosts. */
 export const TEST_SITEKEY = "1x00000000000000000000AA";
 const SESSION_ID = /^[0-9a-f]{64}$/;
@@ -51,14 +76,20 @@ function randomHex(bytes: number): string {
 const siteHosts = (env: Env): ReadonlySet<string> =>
   new Set(env.SITE_HOSTNAME ? [env.SITE_HOSTNAME] : []);
 
+/** Test builds only: replaces the call to Siteverify (the real entry passes nothing). */
+export interface RouteOptions {
+  verifyTurnstile?: (token: unknown, remoteip: string) => Promise<boolean>;
+}
+
 /** `route`, with any unexpected error turned into a fixed 500 (never the error text). */
 export async function safeRoute(
   request: Request,
   env: Env,
   makeClient: () => MessagesClient,
+  options: RouteOptions = {},
 ): Promise<Response> {
   try {
-    return await route(request, env, makeClient);
+    return await route(request, env, makeClient, options);
   } catch {
     return json(500, { error: "Internal error." });
   }
@@ -70,7 +101,12 @@ export async function route(
   request: Request,
   env: Env,
   makeClient: () => MessagesClient,
+  options: RouteOptions = {},
 ): Promise<Response> {
+  const checkTurnstile = (token: unknown, remoteip: string) =>
+    options.verifyTurnstile
+      ? options.verifyTurnstile(token, remoteip)
+      : turnstile(env, isLocal(request), token, remoteip);
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
   if (!hostOk(request, siteHosts(env))) return json(403, { error: "Bad Host header." });
@@ -90,7 +126,7 @@ export async function route(
     return json(200, {
       turnstileSiteKey: local ? TEST_SITEKEY : (env.TURNSTILE_SITEKEY ?? null),
       answersOn: env.MODEL_CALLS === "on",
-      tiers: { ask: true, demo: local, signIn: false },
+      tiers: { ask: true, demo: local || TIER2_PUBLIC, signIn: false },
     });
   }
 
@@ -116,14 +152,7 @@ export async function route(
       modelCallsOn: env.MODEL_CALLS === "on",
       visitor: await visitorKey(ip, env.VISITOR_SALT ?? "local"),
       remoteip: ip,
-      verifyTurnstile: (token, remoteip) => {
-        const options: Parameters<typeof verifyTurnstile>[1] = {
-          secret: env.TURNSTILE_SECRET ?? "",
-          remoteip,
-        };
-        if (!local && env.SITE_HOSTNAME) options.expectedHostname = env.SITE_HOSTNAME;
-        return verifyTurnstile(token, options);
-      },
+      verifyTurnstile: checkTurnstile,
       reserve: (visitor, worst) => budget.reserveAsk(visitor, worst),
       settle: (id, actual) => budget.settle(id, actual),
       answer: (question): Promise<AskResult> =>
@@ -136,25 +165,40 @@ export async function route(
     return json(reply.status, reply.body);
   }
 
-  // Tier 2 (the split-screen demo) is local only until identity phases I2-I4 are done.
-  if (!local) return json(404, { error: "Not found." });
+  // Tier 2 (the split-screen demo).
+  if (!(local || TIER2_PUBLIC)) return json(404, { error: "Not found." });
+  // CF-Connecting-IP is set by Cloudflare; X-Forwarded-For can be forged, so it's never used.
+  const ip = request.headers.get("CF-Connecting-IP") ?? (local ? "127.0.0.1" : "");
 
   if (url.pathname === "/api/sessions") {
     if (request.method !== "POST") return json(405, { error: "Method not allowed." });
     if (!originOk(request)) return json(403, { error: "Request not from this page." });
+    let data: Record<string, unknown>;
     try {
-      await readJson(request);
+      data = await readJson(request);
     } catch (exc) {
       return json(400, { error: exc instanceof BadRequest ? exc.message : "Bad request." });
     }
-    const id = env.SESSIONS.newUniqueId();
-    const token = randomHex(32);
-    if (!(await env.SESSIONS.get(id).init(await tokenHash(token)))) {
-      return json(500, { error: "Could not create a session." });
-    }
-    return json(201, { session: id.toString(), token });
+    if (!ip) return json(403, { error: "Request not from this page." });
+    const budget = env.BUDGET.get(env.BUDGET.idFromName(BUDGET_NAME));
+    const reply = await handleNewSession(data, {
+      modelCallsOn: env.MODEL_CALLS === "on",
+      saltSet: Boolean(env.VISITOR_SALT) || local,
+      visitor: await visitorKey(ip, env.VISITOR_SALT ?? "local"),
+      remoteip: ip,
+      verifyTurnstile: checkTurnstile,
+      allowSession: (visitor) => budget.allowSession(visitor),
+      create: async () => {
+        const id = env.SESSIONS.newUniqueId();
+        const token = randomHex(32);
+        if (!(await env.SESSIONS.get(id).init(await tokenHash(token)))) return null;
+        return { session: id.toString(), token };
+      },
+    });
+    return json(reply.status, reply.body);
   }
 
+  if (!isTier2Route(url.pathname)) return json(404, { error: "Not found." });
   const sessionId = request.headers.get(SESSION_HEADER) ?? "";
   if (!SESSION_ID.test(sessionId)) return json(403, { error: "Missing or unknown session." });
   let id: DurableObjectId;
@@ -163,5 +207,21 @@ export async function route(
   } catch {
     return json(403, { error: "Missing or unknown session." });
   }
-  return env.SESSIONS.get(id).fetch(request);
+  if (!ip || (!env.VISITOR_SALT && !local)) {
+    return json(503, { error: "The demo is switched off right now. Please try again later." });
+  }
+  // The session's limits count by visitor: pass the key, never the IP.
+  const forwarded = new Request(request);
+  forwarded.headers.delete(VISITOR_HEADER);
+  forwarded.headers.set(VISITOR_HEADER, await visitorKey(ip, env.VISITOR_SALT ?? "local"));
+  return env.SESSIONS.get(id).fetch(forwarded);
+}
+
+function turnstile(env: Env, local: boolean, token: unknown, remoteip: string): Promise<boolean> {
+  const options: Parameters<typeof verifyTurnstile>[1] = {
+    secret: env.TURNSTILE_SECRET ?? "",
+    remoteip,
+  };
+  if (!local && env.SITE_HOSTNAME) options.expectedHostname = env.SITE_HOSTNAME;
+  return verifyTurnstile(token, options);
 }

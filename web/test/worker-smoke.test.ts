@@ -42,7 +42,7 @@ test("health: the core runs in workerd with the bundled data", async () => {
 test("unknown routes are 404, and the local explorer API is off", async () => {
   assert.equal((await fetch(new URL("/", base))).status, 200); // the page
   assert.equal((await fetch(new URL("/nope", base))).status, 404);
-  assert.equal((await fetch(new URL("/api/nope", base))).status, 403); // no session
+  assert.equal((await fetch(new URL("/api/nope", base))).status, 404); // not a session route
   const explorer = await fetch(new URL("/cdn-cgi/local/explorer/api/local/workers", base));
   assert.equal(explorer.status, 404);
 });

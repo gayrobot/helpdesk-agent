@@ -136,3 +136,29 @@ footer { max-width: 960px; margin: 0 auto; padding: 0 16px 24px; }
 .turnstile { margin-top: 12px; min-height: 65px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 a { color: var(--accent); }
+
+/* Tier 2: the split-screen demo */
+.demo-page header, .demo-page main { max-width: 1280px; }
+.sim { color: var(--warn); border-color: var(--warn); }
+.sim-note { color: var(--muted); font-size: 0.85rem; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
+.side-title { font-size: 1.15rem; margin: 0 0 12px; }
+.side-toggle { display: none; gap: 8px; margin-bottom: 12px; }
+.side-toggle button { flex: 1; background: transparent; color: var(--text); border-color: var(--border); }
+.side-toggle button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.personas { border: none; padding: 0; margin: 0; }
+.personas legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
+.persona { display: inline-flex; gap: 4px; align-items: center; font-weight: 400; margin-right: 16px; }
+.refusals { color: var(--bad); font-weight: 600; margin: 8px 0 0; }
+.refusals:empty { display: none; }
+.audit { font-size: 0.8rem; padding-left: 1.4rem; max-height: 22rem; overflow: auto; margin: 0 0 8px; }
+.audit li { overflow-wrap: anywhere; }
+button.secondary { background: transparent; color: var(--accent); border-color: var(--border); }
+@media (max-width: 800px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .side-toggle { display: flex; }
+  .side[data-active="false"] { display: none; }
+}
+.side table { table-layout: auto; }
+.side col { width: auto; }
+.side th:nth-child(3), .side td:nth-child(3) { min-width: 9rem; }

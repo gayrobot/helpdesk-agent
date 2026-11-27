@@ -12,6 +12,9 @@ export interface BudgetEnv {
   BUDGET_ASK_PER_VISITOR?: string;
   BUDGET_ASK_GLOBAL?: string;
   BUDGET_SESSIONS_PER_VISITOR?: string;
+  BUDGET_SESSIONS_GLOBAL?: string;
+  BUDGET_TICKETS_PER_VISITOR?: string;
+  BUDGET_TICKETS_GLOBAL?: string;
 }
 
 function limitsFrom(env: BudgetEnv): BudgetLimits {
@@ -24,6 +27,9 @@ function limitsFrom(env: BudgetEnv): BudgetLimits {
     askPerVisitor: num(env.BUDGET_ASK_PER_VISITOR, DEFAULT_LIMITS.askPerVisitor),
     askGlobal: num(env.BUDGET_ASK_GLOBAL, DEFAULT_LIMITS.askGlobal),
     sessionsPerVisitor: num(env.BUDGET_SESSIONS_PER_VISITOR, DEFAULT_LIMITS.sessionsPerVisitor),
+    sessionsGlobal: num(env.BUDGET_SESSIONS_GLOBAL, DEFAULT_LIMITS.sessionsGlobal),
+    ticketsPerVisitor: num(env.BUDGET_TICKETS_PER_VISITOR, DEFAULT_LIMITS.ticketsPerVisitor),
+    ticketsGlobal: num(env.BUDGET_TICKETS_GLOBAL, DEFAULT_LIMITS.ticketsGlobal),
   };
 }
 
@@ -41,6 +47,10 @@ export class Budget extends DurableObject<BudgetEnv> {
 
   reserveAsk(visitor: string, worstUsd: number) {
     return this.ledger().reserveAsk(visitor, worstUsd);
+  }
+
+  reserveTicket(visitor: string, worstUsd: number) {
+    return this.ledger().reserveTicket(visitor, worstUsd);
   }
 
   settle(id: string, actualUsd: number) {

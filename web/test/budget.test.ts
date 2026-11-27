@@ -9,6 +9,9 @@ const LIMITS: BudgetLimits = {
   askPerVisitor: 3,
   askGlobal: 5,
   sessionsPerVisitor: 2,
+  sessionsGlobal: 100,
+  ticketsPerVisitor: 2,
+  ticketsGlobal: 3,
 };
 
 function ledger(start = "2026-11-26T10:00:00Z", limits = LIMITS) {
@@ -95,4 +98,62 @@ test("visitor keys are salted hashes: stable for a day, never the IP", async () 
   assert.notEqual(a, await visitorKey("203.0.113.7", "other", day));
   assert.notEqual(a, await visitorKey("203.0.113.7", "salt", new Date("2026-11-27T12:00:00Z")));
   assert.ok(!a.includes("203"));
+});
+
+test("tier 2: demo tickets per visitor and across the site, against the same dollar cap", async () => {
+  const { l } = ledger(undefined, { ...LIMITS, dailyUsd: 100 });
+  assert.ok((await l.reserveTicket("v1", 0.5)).ok);
+  assert.ok((await l.reserveTicket("v1", 0.5)).ok);
+  const third = await l.reserveTicket("v1", 0.5); // per visitor: 2
+  assert.equal(third.ok, false);
+  assert.ok(!third.ok && /limit of demo tickets/.test(third.reason));
+  assert.ok((await l.reserveTicket("v2", 0.5)).ok);
+  assert.equal((await l.reserveTicket("v3", 0.5)).ok, false); // global: 3
+  // Questions are counted apart from tickets.
+  assert.ok((await l.reserveAsk("v1", 0.01)).ok);
+});
+
+test("tier 2: tickets and questions share the daily dollar cap", async () => {
+  const { l } = ledger();
+  const ticket = await l.reserveTicket("v1", 0.08);
+  assert.ok(ticket.ok);
+  assert.equal((await l.reserveAsk("v2", 0.04)).ok, false); // 0.12 > 0.10
+  if (ticket.ok) await l.settle(ticket.id, 0.02);
+  assert.ok((await l.reserveAsk("v2", 0.04)).ok);
+  // An unknown cost settles as the whole reservation.
+  const again = await l.reserveTicket("v3", 0.03);
+  assert.ok(again.ok);
+  if (again.ok) await l.settle(again.id, Number.NaN);
+  assert.equal((await l.snapshot()).spentUsd.toFixed(2), "0.05");
+});
+
+test("tier 2: sessions across the site, and a ledger stored before tier 2 still loads", async () => {
+  const { l } = ledger(undefined, { ...LIMITS, sessionsGlobal: 2 });
+  assert.ok(await l.allowSession("v1"));
+  assert.ok(await l.allowSession("v2"));
+  assert.equal(await l.allowSession("v3"), false);
+  // A day saved by the tier 1 code has no ticket or session counters.
+  let day: DayLedger | undefined = {
+    date: "2026-11-26",
+    spentUsd: 0,
+    reservedUsd: 0,
+    asks: 0,
+    askByVisitor: {},
+    sessionsByVisitor: {},
+    reservations: {},
+  } as unknown as DayLedger;
+  const old = new BudgetLedger(
+    {
+      load: async () => structuredClone(day),
+      save: async (d) => {
+        day = structuredClone(d);
+      },
+    },
+    LIMITS,
+    () => new Date("2026-11-26T12:00:00Z"),
+  );
+  assert.ok((await old.reserveTicket("v1", 0.01)).ok);
+  assert.ok(await old.allowSession("v1"));
+  assert.equal(day?.tickets, 1);
+  assert.equal(day?.sessions, 1);
 });

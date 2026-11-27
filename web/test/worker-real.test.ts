@@ -104,20 +104,29 @@ test("ts_real_client_runs_in_workerd_against_a_stub_api", async () => {
   const created = await fetch(new URL("/api/sessions", base), {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: base.origin },
-    body: "{}",
+    body: JSON.stringify({ turnstile: "test-human" }),
   });
   bodies.push(await created.clone().text());
   const { session, token } = (await created.json()) as Record<string, string>;
-  const headers = {
+  const headers: Record<string, string> = {
     "X-Helpdesk-Session": session as string,
     "X-Helpdesk-Token": token as string,
     Origin: base.origin,
     "Content-Type": "application/json",
   };
+  // One side signed in is enough here: the helpdesk files the ticket and reads the log.
+  const signedIn = await fetch(new URL("/api/sign-in", base), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ side: "helpdesk", email: "theo.park@example.test" }),
+  });
+  bodies.push(await signedIn.clone().text());
+  headers["X-Helpdesk-Identity"] = ((await signedIn.json()) as Record<string, string>)
+    .token as string;
   const started = await fetch(new URL("/api/runs", base), {
     method: "POST",
     headers,
-    body: JSON.stringify({ requester: "jamie@example.test", ticket: "am I active?" }),
+    body: JSON.stringify({ ticket: "is jamie@example.test active?" }),
   });
   assert.equal(started.status, 202);
   const { run_id: runId } = (await started.json()) as Record<string, string>;
@@ -140,9 +149,11 @@ test("ts_real_client_runs_in_workerd_against_a_stub_api", async () => {
     // same code path from Node).
     assert.equal(call.headers.authorization, `Bearer ${DUMMY_KEY}`);
     assert.equal(call.headers["anthropic-version"], "2026-10-21");
-    assert.ok(String(call.headers["anthropic-beta"]).includes("server-side-fallback-2026-07-01"));
+    // The public demo's settings: capped output and no refusal fallback (src/demo.ts).
+    assert.ok(!String(call.headers["anthropic-beta"] ?? "").includes("server-side-fallback"));
     assert.equal(call.body.model, "claude-sonnet-5-5");
-    assert.equal(call.body.fallbacks, "default");
+    assert.equal(call.body.max_tokens, 2_000);
+    assert.equal(call.body.fallbacks, undefined);
   }
 
   const logRes = await fetch(new URL("/api/log", base), { headers });
