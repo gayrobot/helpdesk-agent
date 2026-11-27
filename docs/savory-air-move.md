@@ -112,15 +112,15 @@ Step 3 ran on the data PR's branch, before merge.
 ## Okta: the shared subset
 
 The Okta tenant holds only the personas a live demo needs, not the whole directory.
-- **Cap:** the sister spec notes a possible **ten active users** across both demos. That's unconfirmed; check it in the admin console.
+- **Cap: ten active users,** confirmed in the admin console on 2026-11-27. Skylar's own admin account is one of them.
 - **The lifecycle demo deactivates its leavers** (P001 to P007). None of them can be a helpdesk requester or approver in tier 3.
-- **The helpdesk's tier 3 accounts (decided 2026-11-27, Skylar):**
-  - Jamie Rivera, the requester
-  - Casey Nguyen and Theo Park, the approvers
-  - Morgan Hale, Jamie's manager and the `directory-admins` persona. Morgan is already the lifecycle demo's IT director, so this account is shared, not added.
+- **The helpdesk's tier 3 accounts: three, at most** (decided 2026-11-27, Skylar):
+  - **User:** Jamie Rivera
+  - **Helpdesk:** Casey Nguyen
+  - **Master administrator:** Morgan Hale, Jamie's manager, in `directory-admins`. Morgan is also the lifecycle demo's IT director, which uses this same account.
 
-  That's three new accounts. Sam Whitfield and Dana Ito stay directory-only.
-- **The lifecycle demo** needs its seven leavers plus Morgan Hale. With the helpdesk's three, that's eleven. If ten is the cap, the lifecycle demo keeps at most six leavers active at once (for example, only the leavers of the scenario being run).
+  Theo Park, Sam Whitfield and Dana Ito stay directory-only.
+- **Seats:** Skylar's account plus the helpdesk's three is four. The lifecycle demo's seven leavers would make eleven, so it keeps at most six leavers active at once (for example, only the leavers of the scenario being run).
 
 ## Requests to the sister repo (Skylar routes; Claude Code doesn't edit it from here)
 
@@ -128,7 +128,8 @@ The Okta tenant holds only the personas a live demo needs, not the whole directo
 - **Make the staff generator skip the emails both demos reserve,** so a generated employee never takes `jamie@example.test` and its neighbours.
 - **Casey Nguyen joins `it-support` and `admins`** in the helpdesk directory. Check this fits the lifecycle demo's view of Casey.
 - **Morgan Hale's Okta account is shared:** the helpdesk adds Morgan to an Okta group `directory-admins`. The lifecycle demo should never deactivate Morgan, and should treat that group as the helpdesk's.
-- **At most six leavers active at once** in Okta, if the org's cap turns out to be ten active users.
+- **At most six leavers active at once** in Okta: the cap is ten active users (confirmed 2026-11-27).
+- **Don't create Okta objects from the demo repos.** The shared tenant's Terraform repo creates every user, group and app, Morgan Hale included, and each demo reads its outputs.
 
 ## Open questions for Skylar
 

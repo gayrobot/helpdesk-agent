@@ -189,19 +189,24 @@ Re-checked against Okta's docs on 2026-11-27. "To confirm" means the docs don't 
 - **Limits, kept rather than worked around:**
   - **No `ticket_id` claim** (claims come from Okta expressions, not request parameters, without an inline hook). Ticket binding stays in the harness. Reuse in another ticket is still refused, because the session's replay cache takes each `jti` once.
   - **One audience per authorization server**, so the dev issuer's three resource audiences become three servers or one shared audience. Decided 2026-11-27: one shared audience (below).
-- **To confirm:**
-  - the shortest access token lifetime Okta allows (it may be minutes, not our 60 seconds)
-  - whether `sub` is the login by default (we require a directory email)
-  - whether the agent app can use `private_key_jwt` for the exchange
+- **Checked in the admin console on 2026-11-27** (Claude Code, read-only, in Skylar's signed-in Chrome; a new-app form was opened to read it and cancelled):
+  - **User cap: 10 active users, confirmed** ("1 of 10 Active users", that one being Skylar's admin account).
+  - **`sub` is the login.** The `default` server's access token sets `sub` to `appuser.userName`, falling back to `app.clientId` when no user is involved. With the app's username format left as the Okta username, that is the `@example.test` login `OktaSubjectVerifier` requires. A new server is expected to have the same default; Terraform's plan will show it.
+  - **Authorization servers:** only `default` exists (audience `api://default`), and it has **no access policy**, as Okta's guide warned. "Add Authorization Server" is offered. Okta's docs give no count of servers for the free plan; they say more than one comes with API Access Management.
+  - **Token Exchange** is a grant on new apps (under Advanced). DPoP is offered too (out of scope here). The sidebar has **MCP Servers** and **Resource Servers** entries, worth a look for I6.
+- **Still to confirm** (Okta's docs don't say, and each is set on an object after it exists, so Terraform's first `plan` and `apply` will answer them):
+  - the shortest access token lifetime an access policy rule allows (it may be minutes, not our 60 seconds)
+  - whether the agent app can use `private_key_jwt` for the exchange (Okta's token exchange guide shows only a client secret over HTTP Basic)
   - whether a Web app can require PKCE
-  - free-plan caps on users and authorization servers
+  - whether this plan allows a second authorization server. If not, use `default` and set its audience in configuration. The code takes the audience as configuration either way.
 - **Built, key-free** (`web/src/okta.ts`, `OktaSubjectVerifier` in `web/src/identity.ts`, `web/test/okta.test.ts`): RS256 next to ES256, a JWKS key set that refetches at most once a minute for an unknown `kid`, and verifiers for Okta sign-in tokens and exchanged grants. They run the token attack list against Okta-shaped tokens signed with keys generated at test time. Nothing is wired to the site yet.
 - **Decided 2026-11-27 (Skylar):**
   - **One issuer per session.** A session's issuer (`dev` or `okta`) is fixed when it's created and stored with it. Tier 2 sessions use the dev issuer, tier 3 sessions Okta, never both in one session. The dev issuer is never built for an Okta session, and the gate refuses an approver whose sign-in came from a different issuer than the requester's. This replaces "the dev issuer refuses to start while a real issuer is configured" for the Worker, where both tiers share one deployment. The Python CLI keeps the process-wide rule. Until Okta sign-in is wired, an Okta session can't be created or opened.
   - **One audience.** One custom authorization server, `savory-air-helpdesk`, audience `api://savory-air-helpdesk`, offering all six tool scopes. `OktaResources` maps the dev issuer's three resource names onto it, so the tool code is unchanged. Resources are kept apart by scope alone: a grant carries exactly the one scope its tool needs, and a test presents every tool's grant at every other tool.
-  - **The Okta subset:** Jamie Rivera (requester); Casey Nguyen and Theo Park (approvers, `it-support`); Morgan Hale (Jamie's manager and the `directory-admins` persona, an account shared with the lifecycle demo). Three new accounts. Details and the seat count: `docs/savory-air-move.md`, "Okta: the shared subset".
+  - **The Okta subset: three users, at most** (Skylar's cap). Jamie Rivera (user), Casey Nguyen (helpdesk, `it-support`), Morgan Hale (master administrator: Jamie's manager and the `directory-admins` persona, an account the lifecycle demo uses too). Theo Park stays out of Okta, so tier 3 has one helpdesk approver; tier 2 still shows a helpdesk-filed reset needing a second one. Details and the seat count: `docs/savory-air-move.md`, "Okta: the shared subset".
+  - **Terraform makes the Okta objects,** from a separate repo that owns the shared tenant (one state for both demos; this repo only reads its outputs through 1Password): the authorization server, its scopes and policy, both apps, the users and the groups. Claude Code writes the configuration and runs `plan` through `op run`. Skylar creates Terraform's own Okta service app and key, stores them in 1Password, and runs `apply`. State stays local and gitignored. No passwords appear in the configuration. The provider gets a dependency review and an exact pin, like any other dependency.
 - **Built, key-free (2026-11-27):** the issuer kind on sessions and in the Durable Object (`issuerKind`, `web/src/identity.ts`), the gate's same-issuer check, and `OktaResources` (`web/src/okta.ts`).
-- **Next, after the "to confirm" items are checked in the console:** the tier 3 sign-in route (Authorization Code with PKCE), the token exchange client, an Okta `SignIn`, and the gate's mixed-issuer test (no Okta `SignIn` can be built yet, so that check has no test until then).
+- **Next:** the tenant's Terraform, in its own repo with its own dependency review; then the tier 3 sign-in route (Authorization Code with PKCE), the token exchange client, an Okta `SignIn`, and the gate's mixed-issuer test (no Okta `SignIn` can be built yet, so that check has no test until then).
 - **Still open:** where `directory-admins` membership lives for the helpdesk. It isn't in `directory.json`; the admin's edit route isn't built.
 
 ## I6 notes: MCP
