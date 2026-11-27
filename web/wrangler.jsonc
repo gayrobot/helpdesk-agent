@@ -1,4 +1,5 @@
-// Local development only until Phase 10 (deploys go through GitHub Actions then).
+// The public site (Phase 9, tiers 1 and 2), deployed from this machine for now; Phase 10
+// moves deploys to GitHub Actions.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "helpdesk-agent",
@@ -41,7 +42,7 @@
     ]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HelpdeskSession", "Budget"] }],
-  // The public site (Phase 9, tier 1 for now). Deployed from this machine by Claude Code
+  // The public site (Phase 9, tiers 1 and 2). Deployed from this machine by Claude Code
   // with Skylar's local wrangler login (allowed 2026-11-26).
   "routes": [{ "pattern": "hddemo.damiano.dev", "custom_domain": true }],
   "vars": { "SITE_HOSTNAME": "hddemo.damiano.dev" }

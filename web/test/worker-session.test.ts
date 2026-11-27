@@ -351,27 +351,22 @@ test("ts_config_on_loopback_uses_the_turnstile_test_key_and_shows_the_demo", asy
   });
 });
 
-test("ts_on_the_public_hostname_tier_2_is_off_and_ask_is_guarded", async () => {
+test("ts_on_the_public_hostname_tier_2_is_open_and_guarded", async () => {
   const site = "demo.example.test";
   const config = await raw(site, "GET", "/api/config");
   assert.equal(config.status, 200);
-  assert.deepEqual(config.body.tiers, { ask: true, demo: false, signIn: false });
+  assert.deepEqual(config.body.tiers, { ask: true, demo: true, signIn: false });
   assert.equal(config.body.turnstileSiteKey, "test-sitekey");
   const json = { "Content-Type": "application/json", Origin: `http://${site}` };
-  // The split-screen demo's API doesn't exist on the public hostname yet.
-  assert.equal((await raw(site, "POST", "/api/sessions", json, "{}")).status, 404);
-  // Nor does any route behind it, with or without a plausible session.
+  // The split-screen demo is open on the public hostname, behind Turnstile.
+  assert.equal((await raw(site, "POST", "/api/sessions", json, "{}")).status, 403);
+  // Its routes need a real session; anything off the allowlist doesn't exist.
   const sid = { "X-Helpdesk-Session": "0".repeat(64), "X-Helpdesk-Token": "t" };
-  for (const path of [
-    "/api/current",
-    "/api/requesters",
-    "/api/log",
-    "/api/runs/0123456789abcdef",
-  ]) {
-    assert.equal((await raw(site, "GET", path, sid)).status, 404, path);
+  for (const path of ["/api/current", "/api/requesters", "/api/log"]) {
+    assert.equal((await raw(site, "GET", path, sid)).status, 403, path);
   }
-  for (const path of ["/api/sign-in", "/api/runs", "/api/runs/0123456789abcdef/decision"]) {
-    assert.equal((await raw(site, "POST", path, { ...json, ...sid }, "{}")).status, 404, path);
+  for (const path of ["/api/admin", "/api/runs/zz", "/api/budget"]) {
+    assert.equal((await raw(site, "GET", path, sid)).status, 404, path);
   }
   // /api/ask without Cloudflare's visitor IP header, and without a Turnstile token.
   const question = JSON.stringify({ question: "How do I set up the VPN?" });

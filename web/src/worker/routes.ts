@@ -46,7 +46,7 @@ export interface Env {
  * Whether tier 2 is open on the public hostname. Locally it always is. Opening it is its
  * own change, after the demo's limits and labels are in place.
  */
-export const TIER2_PUBLIC = false;
+export const TIER2_PUBLIC = true;
 
 /** The session API paths a public request may reach (anything else under /api/ is 404). */
 const TIER2_ROUTES: readonly RegExp[] = [
