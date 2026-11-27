@@ -40,7 +40,7 @@ None of this can start before the credits are on the account. Do it the day they
 
 Skylar, by hand. Nothing uses it until Phase 8 (identity phase I5), but it's created early so the rewrite can be designed around it.
 
-- [x] **Create an Okta Integrator Free Plan org** at developer.okta.com. Use it only for this project. (Done by 2026-11-25.)
+- [x] **Create an Okta Integrator Free Plan org** at developer.okta.com. Use it only for this project and its sister, `identity-lifecycle-agent`, which share it (2026-11-27). (Done by 2026-11-25.)
 - [x] **Sign in with phishing-resistant MFA** on your own admin account (a passkey or WebAuthn key). (Done by 2026-11-27.)
 - [ ] **Put nothing real in it.** Only synthetic personas at `example.test`. No real people, no connections to other orgs, no production apps. (2026-11-27, Skylar: this tenant is shared with the sister project `identity-lifecycle-agent` (Savory Air) as part of a larger project proving AI enablement for IT. The two demos' personas are being aligned first, because one login can't be two people. See `identity-plan.md`, I5 findings.)
 - [x] **Store the org URL in 1Password.** It is in `Nerd Shit` → `Personal Okta Developer Tenant`, with your admin username. Client IDs and the agent's key go in an item referenced from `.env.tpl`; never paste them into a terminal, chat or file. (Done by 2026-11-27.)
@@ -52,7 +52,9 @@ Claude Code never signs in to this org, never completes a device sign-in, and ne
 
 Skylar, by hand, in the Okta admin console, after the open decisions in `docs/identity-plan.md` (I5 notes) are settled. Everything here is OIDC / OAuth 2.0; there is no SAML.
 
-- [ ] **Custom authorization server.** Use `default` or create `larkspur-helpdesk`, with audience `api://larkspur-helpdesk`. Add the scopes `directory:read`, `devices:read`, `directory:mfa.reset`, `directory:group.add`, `runbooks:read`, `tickets:escalate`. Add an access policy: a new free org's server may have none. Set the shortest access token lifetime Okta allows, and write the number down here.
+**On hold (2026-11-27):** the helpdesk is moving to Savory Air's personas first (`docs/plan.md`). Don't create anything below until that lands. The names below are placeholders until then.
+
+- [ ] **Custom authorization server.** Use `default` or create one named for the helpdesk (for example `savory-air-helpdesk`, with audience `api://savory-air-helpdesk`), named so the lifecycle demo's servers sit beside it in the shared tenant. Add the scopes `directory:read`, `devices:read`, `directory:mfa.reset`, `directory:group.add`, `runbooks:read`, `tickets:escalate`. Add an access policy: a new free org's server may have none. Set the shortest access token lifetime Okta allows, and write the number down here.
 - [ ] **Sign-in app** (tier 3): an OIDC app integration, Authorization Code with PKCE, sign-in redirect `https://hddemo.damiano.dev/auth/callback` (that route lands in a later PR). Assign only the synthetic users.
 - [ ] **Agent app:** an API Services app integration with the Token Exchange grant (Grant type → Advanced). Client authentication: public key / private key if Okta offers it for this grant, otherwise client secret. Make the authorization server trust itself for the exchange (Trusted servers), as in Okta's token exchange guide.
 - [ ] **Users:** only the synthetic personas chosen for tier 3, each with an `@example.test` login and a password you set, drawn from the persona set shared with Savory Air. The shared org may be capped at ten active users (unconfirmed), across both demos. Never give a synthetic user an Okta admin role.
