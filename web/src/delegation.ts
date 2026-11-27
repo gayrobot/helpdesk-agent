@@ -12,7 +12,7 @@
  * ticket, tool and arguments (recomputed here), approved by someone other than the
  * requester, and used once.
  */
-import { type Grant, type Resources, TokenError } from "./identity.ts";
+import { type Grant, type ResourceMap, TokenError } from "./identity.ts";
 import type { Receipt, ReceiptAuthority } from "./receipts.ts";
 import { type Args, type ToolContext, ToolKind, type ToolResult, type ToolSpec } from "./tools.ts";
 
@@ -57,7 +57,7 @@ export async function runWithGrant(
   ctx: ToolContext,
   args: Args,
   token: unknown,
-  resources: Resources,
+  resources: ResourceMap,
   approval: ApprovalProof | null = null,
 ): Promise<{ result: ToolResult; grant: Grant; receipt: Receipt | null }> {
   const needed = toolGrant(spec.name);

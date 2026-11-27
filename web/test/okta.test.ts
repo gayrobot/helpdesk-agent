@@ -4,9 +4,10 @@
 import assert from "node:assert/strict";
 import { createHmac, sign as nodeSign } from "node:crypto";
 import { test } from "node:test";
-
+import { TOOL_GRANTS, toolGrant } from "../src/delegation.ts";
 import {
   b64urlEncode,
+  DevIssuer,
   type Key,
   type KeyPair,
   OktaSubjectVerifier,
@@ -16,7 +17,14 @@ import {
   TokenError,
   verifyJwsSignature,
 } from "../src/identity.ts";
-import { importKeySet, JwksKeySet, jwksUri, OktaGrantVerifier, oktaIssuer } from "../src/okta.ts";
+import {
+  importKeySet,
+  JwksKeySet,
+  jwksUri,
+  OktaGrantVerifier,
+  OktaResources,
+  oktaIssuer,
+} from "../src/okta.ts";
 
 const NOW = 1_795_000_000;
 const ISSUER = "https://savory-air-test.okta.com/oauth2/aus000000000test";
@@ -340,4 +348,42 @@ test("an unreachable key set fails closed", async () => {
     throw new Error("network");
   }) as unknown as typeof fetch;
   await rejects(new JwksKeySet({ issuer: ISSUER, fetch: thrower }).key("k1"), "network");
+});
+
+// ---------------------------------------------------------------- one audience, every tool
+
+test("one Okta audience serves every tool; scopes alone keep the resources apart", async () => {
+  const { grants, sign } = await setup();
+  const resources = new OktaResources(grants);
+  const tools = Object.keys(TOOL_GRANTS);
+  assert.deepEqual(
+    [...new Set(tools.map((t) => toolGrant(t).scope))].sort(),
+    OktaResources.scopes().sort(),
+    "the authorization server offers exactly the tools' scopes",
+  );
+  let n = 0;
+  for (const tool of tools) {
+    for (const other of tools) {
+      const token = await sign(grantClaims({ scp: [toolGrant(other).scope], jti: `AT.${n++}` }));
+      const needed = toolGrant(tool);
+      const check = resources.get(needed.audience).verify(token, needed.scope, "T-1");
+      if (toolGrant(other).scope === needed.scope) {
+        assert.equal((await check).scope, needed.scope, tool);
+      } else {
+        await rejects(check, `${other}'s grant at ${tool}`);
+      }
+    }
+  }
+  assert.throws(() => resources.get("api://savory-air-helpdesk"), TokenError, "not a resource");
+  assert.throws(() => resources.get("__proto__"), TokenError);
+});
+
+// ---------------------------------------------------------------- one issuer per session
+
+test("a dev-issuer session never accepts an Okta sign-in, nor Okta a dev one", async () => {
+  const { subject, sign, clock } = await setup();
+  const dev = new DevIssuer({ now: () => clock.t });
+  const okta = await sign(subjectClaims());
+  await rejects((await dev.verifier()).verify(okta), "Okta token at the dev issuer");
+  await rejects(subject.verify(await dev.mint(JAMIE)), "dev token at the Okta verifier");
 });

@@ -2,7 +2,7 @@
 
 Decided 2026-11-27 (Skylar): the helpdesk moves from Larkspur Labs to **Savory Air**, the fictional retailer of the sister repo `identity-lifecycle-agent`. Both demos fold into one larger project that proves AI enablement for IT, and they share one Okta tenant. One Okta login can't be two people, so the personas have to agree first.
 
-Skylar approved the mapping on 2026-11-27. The data move (step 2) is built as described below, with the two small departures noted in the table. Identity I5 (Okta) is paused until the move lands.
+Skylar approved the mapping on 2026-11-27. The data move (step 2) is built as described below, with the two small departures noted in the table. The move landed and was deployed on 2026-11-27 (step 4), and I5 resumed the same day.
 
 Checked against `identity-lifecycle-agent` `src/people.ts` at `origin/main` `74a3da5` on 2026-11-27.
 
@@ -98,8 +98,8 @@ Each step is a PR unless marked otherwise. The live site isn't redeployed until 
 | 1 | This document, signed off | Skylar approves the mapping, or edits it |
 | 2 | **The data move**, in one PR, because CI ties the directory, tickets and parity fixtures together. It covers: `directory.json`, runbook names, the four Omar tickets, group renames in tickets, transcripts, Python and TypeScript tests, regenerated parity fixtures (`scripts/parity_fixtures.py`), the restricted runbooks' company name, the site pages and tier 2's personas | `uv run pytest` and `npm run check` pass. Every ticket still names a real directory user. No "Larkspur" outside history (`evals/results/`, dated plan entries). |
 | 3 | **Live evals** (Claude Code, via `op run`) | `--limit` first to measure cost, then full Python (the new baseline), then full TypeScript compared with `scripts/compare_results.py`, plus the retrieval eval. Results committed. Old Larkspur results stay as history. |
-| 4 | **Redeploy** `hddemo.damiano.dev` from the merged, green `main` | The site shows Savory Air. Sessions created before the deploy expire within 24 hours (alarm cleanup). |
-| 5 | **Resume I5** (PR #43 and onward): the Okta subset and seeding | See "Okta" below |
+| 4 | **Redeploy** `hddemo.damiano.dev` from the merged, green `main` | The site shows Savory Air. Sessions created before the deploy expire within 24 hours (alarm cleanup). Done 2026-11-27 from `dc26b4e`: every page says Savory Air, health reports 46 users. |
+| 5 | **Resume I5** (PR #43 and onward): the Okta subset and seeding | See "Okta" below. Resumed 2026-11-27 after the redeploy; the subset is decided. |
 
 ## Results (2026-11-27)
 
@@ -112,22 +112,24 @@ Step 3 ran on the data PR's branch, before merge.
 ## Okta: the shared subset
 
 The Okta tenant holds only the personas a live demo needs, not the whole directory.
-- **Cap:** the sister spec notes a possible **ten active users** across both demos. That's unconfirmed; check it in the admin console.
+- **Cap: ten active users,** confirmed in the admin console on 2026-11-27. Skylar's own admin account is one of them.
 - **The lifecycle demo deactivates its leavers** (P001 to P007). None of them can be a helpdesk requester or approver in tier 3.
-- **The helpdesk's tier 3 needs:**
-  - a requester (Jamie Rivera)
-  - two approvers (Casey Nguyen, Theo Park)
-  - an admin in `directory-admins` (Sam Whitfield proposed)
-  - optionally a manager requester (Dana Ito)
+- **The helpdesk's tier 3 accounts: three, at most** (decided 2026-11-27, Skylar):
+  - **User:** Jamie Rivera
+  - **Helpdesk:** Casey Nguyen
+  - **Master administrator:** Morgan Hale, Jamie's manager, in `directory-admins`. Morgan is also the lifecycle demo's IT director, which uses this same account.
 
-  That's four or five users.
-- **The lifecycle demo** needs its leavers plus Morgan Hale. If ten is the cap, that doesn't fit at once. The lifecycle demo may have to keep only the leaver being demonstrated active.
+  Theo Park, Sam Whitfield and Dana Ito stay directory-only.
+- **Seats:** Skylar's account plus the helpdesk's three is four. The lifecycle demo's seven leavers would make eleven, so it keeps at most six leavers active at once (for example, only the leavers of the scenario being run).
 
 ## Requests to the sister repo (Skylar routes; Claude Code doesn't edit it from here)
 
 - **Add the helpdesk-only personas** to `people.ts` (or a shared list both repos read later), with the roles above.
 - **Make the staff generator skip the emails both demos reserve,** so a generated employee never takes `jamie@example.test` and its neighbours.
 - **Casey Nguyen joins `it-support` and `admins`** in the helpdesk directory. Check this fits the lifecycle demo's view of Casey.
+- **Morgan Hale's Okta account is shared:** the helpdesk adds Morgan to an Okta group `directory-admins`. The lifecycle demo should never deactivate Morgan, and should treat that group as the helpdesk's.
+- **At most six leavers active at once** in Okta: the cap is ten active users (confirmed 2026-11-27).
+- **Don't create Okta objects from the demo repos.** The shared tenant's Terraform repo creates every user, group and app, Morgan Hale included, and each demo reads its outputs.
 
 ## Open questions for Skylar
 

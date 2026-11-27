@@ -50,14 +50,26 @@ Claude Code never signs in to this org, never completes a device sign-in, and ne
 
 ## 1c. Identity I5: setting up Okta (added 2026-11-27)
 
-Skylar, by hand, in the Okta admin console, after the open decisions in `docs/identity-plan.md` (I5 notes) are settled. Everything here is OIDC / OAuth 2.0; there is no SAML.
+Everything here is OIDC / OAuth 2.0; there is no SAML.
 
-**On hold (2026-11-27):** the move to Savory Air's personas has landed (`docs/savory-air-move.md`). Wait until the Okta subset (which personas, within the possible ten-user cap) is agreed with the lifecycle demo; the names below are placeholders until then.
+**Decided 2026-11-27 (Skylar):**
+- One authorization server, with one audience for every tool.
+- **Three helpdesk users, no more:** a user, a helpdesk person and a master administrator.
+- Each session is fixed to one issuer (`docs/identity-plan.md`, I5 decisions).
+- **The Okta objects below are made with Terraform, not by hand, from a repo of its own.** The tenant is shared with `identity-lifecycle-agent` and the larger project, so one repo and one Terraform state own the whole tenant. Each demo reads that repo's outputs (issuer URL, client ids) through 1Password and never runs Terraform itself. Claude Code writes the configuration and runs `terraform plan`. **Skylar runs `terraform apply`.** Until that repo exists, the items below describe what it will create for the helpdesk.
 
-- [ ] **Custom authorization server.** Use `default` or create one named for the helpdesk (for example `savory-air-helpdesk`, with audience `api://savory-air-helpdesk`), named so the lifecycle demo's servers sit beside it in the shared tenant. Add the scopes `directory:read`, `devices:read`, `directory:mfa.reset`, `directory:group.add`, `runbooks:read`, `tickets:escalate`. Add an access policy: a new free org's server may have none. Set the shortest access token lifetime Okta allows, and write the number down here.
+**Checked in the console on 2026-11-27** (Claude Code, read-only, in Skylar's signed-in Chrome; nothing was saved). The results are in `docs/identity-plan.md`, I5 findings.
+
+- [ ] **Custom authorization server, one for the helpdesk.** Create one named `savory-air-helpdesk` with audience `api://savory-air-helpdesk` (decided 2026-11-27: one audience for all tools; resources are kept apart by scope), named so the lifecycle demo's servers sit beside it in the shared tenant. Add the scopes `directory:read`, `devices:read`, `directory:mfa.reset`, `directory:group.add`, `runbooks:read`, `tickets:escalate`. Add an access policy: a new free org's server may have none. Set the shortest access token lifetime Okta allows, and write the number down here.
 - [ ] **Sign-in app** (tier 3): an OIDC app integration, Authorization Code with PKCE, sign-in redirect `https://hddemo.damiano.dev/auth/callback` (that route lands in a later PR). Assign only the synthetic users.
 - [ ] **Agent app:** an API Services app integration with the Token Exchange grant (Grant type → Advanced). Client authentication: public key / private key if Okta offers it for this grant, otherwise client secret. Make the authorization server trust itself for the exchange (Trusted servers), as in Okta's token exchange guide.
-- [ ] **Users:** only the synthetic personas chosen for tier 3, each with an `@example.test` login and a password you set, drawn from the persona set shared with Savory Air. The shared org may be capped at ten active users (unconfirmed), across both demos. Never give a synthetic user an Okta admin role.
+- [ ] **Users: three, at most** (Skylar's cap, 2026-11-27). Each has an `@example.test` login. Terraform sets no password; you set passwords in the console. Never give a synthetic user an Okta admin role. "Master administrator" is the helpdesk's `directory-admins` role, not an Okta role.
+  - **User:** `jamie@example.test`, Jamie Rivera, the requester.
+  - **Helpdesk:** `casey.nguyen@example.test`, Casey Nguyen, the approver, in `it-support`.
+  - **Master administrator:** `morgan.hale@example.test`, Morgan Hale, Jamie's manager, in `directory-admins`. Morgan is also the lifecycle demo's IT director, so the lifecycle demo uses this account rather than creating a second one.
+  - **Seats:** the org's cap is **10 active users**, confirmed in the console ("1 of 10", that one being your admin account). Your account plus these three is four, so the lifecycle demo can keep at most six of its seven leavers active at once.
+  - **Theo Park stays out of Okta.** In tier 3 there is one helpdesk approver, so a helpdesk-filed reset can't be approved there (it needs a second `it-support` person). Tier 2 still shows that case.
+- [ ] **Groups:** `it-support` (Casey) and `directory-admins` (Morgan). `it-support` matches `directory.json`; `directory-admins` exists only in `web/src/authz.ts` (an authority group) and in Okta, not in `directory.json`.
 - [ ] **1Password:** put the issuer URL, both client IDs, and the agent's key or secret in one item (for example `HelpDeskAgent-Okta` in `Nerd Shit`). Then add references to `.env.tpl` yourself (Claude Code doesn't open that file):
 
   ```
