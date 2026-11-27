@@ -73,6 +73,8 @@ export interface StoredRun {
   events: Record<string, unknown>[];
   /** What this run's model calls cost in US dollars; null if any call's cost was unknown. */
   cost_usd?: number | null;
+  /** Tier 2: the budget reservation this run holds until it is settled. */
+  reservation_id?: string | null;
 }
 
 interface Pending {
@@ -235,7 +237,7 @@ export class Session {
 
   // ------------------------------------------------------------ runs
 
-  async startRun(requester: unknown, body: unknown): Promise<Run> {
+  async startRun(requester: unknown, body: unknown, reservationId?: string): Promise<Run> {
     if (typeof requester !== "string" || !this.known.has(requester)) {
       throw new BadRequest("Pick a requester from the list.");
     }
@@ -254,6 +256,7 @@ export class Session {
       tool_turns: 0,
       events: [],
       pending: null,
+      reservation_id: reservationId ?? null,
     };
     this.runs.set(run.id, run);
     this.current = run;
@@ -441,6 +444,10 @@ export class Session {
     if (approve) {
       const rule = mayApprove(this.directory, approver, pending.requester, pending.target);
       if (rule) {
+        // Recorded once per approver per proposal, however often they click.
+        if (pending.refusals.some((r) => r.approver === safe(approver))) {
+          return { ok: false, refusal: rule };
+        }
         pending.refusals.push({ approver: safe(approver), rule: safe(rule) });
         await this.auditFor([]).record("approval_refused", {
           ticket_id: run.ticket_id,
@@ -461,6 +468,34 @@ export class Session {
     pending.decision = approve;
     pending.resolve();
     return { ok: true };
+  }
+
+  /**
+   * Tier 2: finished runs whose budget reservation hasn't been settled (a restart
+   * interrupted them), with their cost summed from the stored call log: null when a
+   * call's cost is unknown, which settles as the whole reservation.
+   */
+  async unsettled(): Promise<{ runId: string; reservationId: string; costUsd: number | null }[]> {
+    const open = [...this.runs.values()].filter((r) => r.reservation_id && r.status !== "running");
+    if (open.length === 0) return [];
+    const { calls } = await this.opts.store.readLog();
+    return open.map((run) => {
+      let cost: number | null = 0;
+      for (const c of calls) {
+        if (c.event !== "model_call" || c.ticket_id !== run.ticket_id) continue;
+        if (c.cost_usd === undefined) continue; // a failed call: not billed
+        cost = typeof c.cost_usd === "number" && cost !== null ? cost + c.cost_usd : null;
+      }
+      return { runId: run.id, reservationId: run.reservation_id as string, costUsd: cost };
+    });
+  }
+
+  /** Tier 2: the run's reservation has been settled; forget it. */
+  async markSettled(runId: string): Promise<void> {
+    const run = this.runs.get(runId);
+    if (!run?.reservation_id) return;
+    run.reservation_id = null;
+    await this.persistRuns();
   }
 
   /** Who filed a run, or null for an unknown run. */

@@ -14,13 +14,17 @@ let worker: Awaited<ReturnType<typeof startLocalWorker>>;
 let base: URL;
 const CONFIG = new URL("./worker/wrangler.test.jsonc", import.meta.url).pathname;
 
+// Fresh Durable Object state, so the site budget's daily session counts start at zero.
+const freshState = mkdtempSync(join(tmpdir(), "helpdesk-session-"));
+
 before(async () => {
-  worker = await startLocalWorker(0, CONFIG);
+  worker = await startLocalWorker(0, CONFIG, freshState);
   base = await worker.url;
 });
 
 after(async () => {
   await worker?.dispose();
+  rmSync(freshState, { recursive: true, force: true });
 });
 
 const origin = () => base.origin;

@@ -286,6 +286,12 @@ function resultRow(e) {
   meta.className = "meta hash";
   setText(meta, `sha256 ${hash} (matches result_sha256 in the audit trail below)`);
   details.appendChild(meta);
+  if (e.result_altered) {
+    const warn = document.createElement("p");
+    warn.className = "meta altered";
+    setText(warn, "Shown with control characters replaced or cut for length; the hash is of the original.");
+    details.appendChild(warn);
+  }
   td.appendChild(details);
   tr.appendChild(td);
   return tr;

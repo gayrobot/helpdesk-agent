@@ -6,6 +6,11 @@
  * Cleanup: an alarm deletes all of the session's storage about `SESSION_TTL_MS` after its
  * last use. Every request pushes the alarm back (at most once a minute, since the page
  * polls), and the alarm handler checks the last use again before deleting.
+ *
+ * Budget: while a ticket runs the alarm comes sooner (`RUN_CHECK_MS`). If the object was
+ * evicted or restarted mid-run, reopening the session marks the run interrupted, and its
+ * reservation is settled from the stored call log, so a lost run can't hold the site's
+ * daily budget until midnight.
  */
 import { DurableObject } from "cloudflare:workers";
 
@@ -31,6 +36,8 @@ import { VISITOR_HEADER } from "./routes.ts";
 /** About 24 hours after a session's last use, its storage is deleted. */
 export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const ALARM_REFRESH_MS = 60_000;
+/** Longer than an approval can wait (5 minutes) plus the model calls around it. */
+export const RUN_CHECK_MS = 8 * 60 * 1000;
 
 const MAX_STORED_RUNS = 20;
 
@@ -101,6 +108,8 @@ export interface SessionTimings {
   minReviewMs?: number;
   /** How long after its last use a session's storage is deleted. */
   ttlMs?: number;
+  /** How soon the alarm checks on a running ticket. */
+  runCheckMs?: number;
 }
 
 export interface SessionEnv {
@@ -111,12 +120,13 @@ export interface SessionEnv {
 
 /** The Durable Object class, with the model client supplied by the entry point. */
 export function sessionObjectClass(makeClient: () => MessagesClient, timings: SessionTimings = {}) {
-  const { ttlMs = SESSION_TTL_MS, ...sessionTimings } = timings;
+  const { ttlMs = SESSION_TTL_MS, runCheckMs = RUN_CHECK_MS, ...sessionTimings } = timings;
   return class HelpdeskSession extends DurableObject<SessionEnv> {
     private session: Promise<Session> | null = null;
     private signIns: SideSignIns | null = null;
     private directory: Directory | null = null;
     private alarmSetAt = 0;
+    private armedForRun = false;
 
     /** Called once by the Worker when it creates the session. */
     async init(hash: string): Promise<boolean> {
@@ -132,18 +142,65 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
       if (!force && now - this.alarmSetAt < Math.min(ALARM_REFRESH_MS, ttlMs / 2)) return;
       this.alarmSetAt = now;
       await this.ctx.storage.put("last_used", now);
-      await this.ctx.storage.setAlarm(now + ttlMs);
+      await this.rearm();
     }
 
-    /** Delete everything once the session has gone unused for the TTL. */
-    override async alarm(): Promise<void> {
+    /** The next alarm: soon while a ticket runs, else the end of the session's life. */
+    private async rearm(): Promise<void> {
       const last = (await this.ctx.storage.get<number>("last_used")) ?? 0;
-      const due = last + ttlMs;
-      if (Date.now() < due) {
-        await this.ctx.storage.setAlarm(due); // used since the alarm was set
+      const busy = this.session ? (await this.session).isBusy() : false;
+      this.armedForRun = busy;
+      await this.ctx.storage.setAlarm(
+        busy ? Date.now() + runCheckMs : Math.max(last + ttlMs, Date.now() + 1),
+      );
+    }
+
+    private budget() {
+      return this.env.BUDGET.get(this.env.BUDGET.idFromName(BUDGET_NAME));
+    }
+
+    /** Open the session (once per instance) and settle what a restart interrupted. */
+    private openSession(): Promise<Session> {
+      if (!this.session) {
+        // One issuer per session, its key in memory only: both sides' sign-ins and every
+        // run's tokens come from it, and none survive a restart.
+        const issuer = new DevIssuer();
+        this.signIns = new SideSignIns(issuer);
+        const opened = Session.open({
+          client: makeClient(),
+          store: new DurableStore(this.ctx.storage),
+          retriever: bundledAclRetriever(),
+          issuer,
+          operators: DEMO_HELPDESK,
+          modelOptions: DEMO_MODEL_OPTIONS,
+          maxToolTurns: DEMO_MAX_TOOL_TURNS,
+          ...sessionTimings,
+        }).then(async (session) => {
+          for (const lost of await session.unsettled()) {
+            await this.budget().settle(lost.reservationId, lost.costUsd ?? Number.NaN);
+            await session.markSettled(lost.runId);
+          }
+          return session;
+        });
+        this.session = opened;
+        opened.catch(() => {
+          if (this.session === opened) this.session = null;
+        });
+      }
+      return this.session;
+    }
+
+    /** Check on a running ticket, or delete everything once the session has gone unused. */
+    override async alarm(): Promise<void> {
+      if ((await this.ctx.storage.get("token_hash")) === undefined) return;
+      // After an eviction this reopens the session, which settles an interrupted run.
+      const session = await this.openSession();
+      const last = (await this.ctx.storage.get<number>("last_used")) ?? 0;
+      if (session.isBusy() || Date.now() < last + ttlMs) {
+        await this.rearm();
         return;
       }
-      if (this.session) (await this.session).shutdown();
+      session.shutdown();
       this.session = null;
       this.signIns = null;
       this.directory = null;
@@ -165,29 +222,10 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
       if (hash === undefined) return json(403, { error: "Unknown session." });
       if (!(await tokenOk(request, hash))) return json(403, { error: "Missing or wrong token." });
       await this.touch();
-      if (!this.session) {
-        // One issuer per session, its key in memory only: both sides' sign-ins and every
-        // run's tokens come from it, and none survive a restart.
-        const issuer = new DevIssuer();
-        this.signIns = new SideSignIns(issuer);
-        this.session = Session.open({
-          client: makeClient(),
-          store: new DurableStore(this.ctx.storage),
-          retriever: bundledAclRetriever(),
-          issuer,
-          operators: DEMO_HELPDESK,
-          modelOptions: DEMO_MODEL_OPTIONS,
-          maxToolTurns: DEMO_MAX_TOOL_TURNS,
-          ...sessionTimings,
-        });
-        this.session.catch(() => {
-          this.session = null;
-        });
-      }
-      const session = await this.session;
+      const session = await this.openSession();
       // The pickers read the stock directory; the gate reads the session's own copy.
       this.directory ??= Directory.load();
-      const budget = this.env.BUDGET.get(this.env.BUDGET.idFromName(BUDGET_NAME));
+      const budget = this.budget();
       const response = await handleDemoApi(
         request,
         session,
@@ -206,7 +244,9 @@ export function sessionObjectClass(makeClient: () => MessagesClient, timings: Se
           extraHosts: new Set(this.env.SITE_HOSTNAME ? [this.env.SITE_HOSTNAME] : []),
         },
       );
-      // Keep the object running until the ticket finishes, not just this request.
+      // Keep the object running until the ticket finishes, not just this request, and
+      // check on it soon if it doesn't (an eviction mid-run).
+      if (session.isBusy() && !this.armedForRun) await this.rearm();
       this.ctx.waitUntil(session.active);
       return response;
     }

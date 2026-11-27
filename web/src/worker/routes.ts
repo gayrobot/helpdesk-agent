@@ -79,6 +79,8 @@ const siteHosts = (env: Env): ReadonlySet<string> =>
 /** Test builds only: replaces the call to Siteverify (the real entry passes nothing). */
 export interface RouteOptions {
   verifyTurnstile?: (token: unknown, remoteip: string) => Promise<boolean>;
+  /** Test builds only: open tier 2 on the public hostname regardless of TIER2_PUBLIC. */
+  tier2Public?: boolean;
 }
 
 /** `route`, with any unexpected error turned into a fixed 500 (never the error text). */
@@ -111,6 +113,7 @@ export async function route(
   if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
   if (!hostOk(request, siteHosts(env))) return json(403, { error: "Bad Host header." });
   const local = isLocal(request);
+  const tier2Open = local || (options.tier2Public ?? TIER2_PUBLIC);
 
   if (url.pathname === "/api/health" && request.method === "GET") {
     const chunks = bundledChunks();
@@ -126,7 +129,7 @@ export async function route(
     return json(200, {
       turnstileSiteKey: local ? TEST_SITEKEY : (env.TURNSTILE_SITEKEY ?? null),
       answersOn: env.MODEL_CALLS === "on",
-      tiers: { ask: true, demo: local || TIER2_PUBLIC, signIn: false },
+      tiers: { ask: true, demo: tier2Open, signIn: false },
     });
   }
 
@@ -166,7 +169,7 @@ export async function route(
   }
 
   // Tier 2 (the split-screen demo).
-  if (!(local || TIER2_PUBLIC)) return json(404, { error: "Not found." });
+  if (!tier2Open) return json(404, { error: "Not found." });
   // CF-Connecting-IP is set by Cloudflare; X-Forwarded-For can be forged, so it's never used.
   const ip = request.headers.get("CF-Connecting-IP") ?? (local ? "127.0.0.1" : "");
 

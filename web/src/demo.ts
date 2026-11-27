@@ -60,13 +60,18 @@ export const DEMO_MODEL_OPTIONS: ModelCallerOptions = {
   fallbacks: false,
 };
 
-/** The most one demo ticket can cost: every call at the prompt ceiling and full output. */
+/**
+ * The most one demo ticket can cost: every call at the prompt ceiling and full output.
+ * Every request asks for caching, so a prompt can bill at the cache-write rate, which is
+ * higher than the plain input rate; the ceiling uses whichever is higher.
+ */
 export function ticketWorstCaseUsd(): number {
   const price = PRICES[AGENT_MODEL];
   if (!price) throw new Error("no price for the agent model");
   const calls = DEMO_MAX_TOOL_TURNS + 1;
+  const inputRate = Math.max(price.input, price.cacheWrite);
   return (
-    (calls * (DEMO_PROMPT_TOKEN_CEILING * price.input + DEMO_MAX_TOKENS * price.output)) / 1_000_000
+    (calls * (DEMO_PROMPT_TOKEN_CEILING * inputRate + DEMO_MAX_TOKENS * price.output)) / 1_000_000
   );
 }
 
@@ -266,7 +271,7 @@ export async function handleDemoApi(
     let runId: string;
     try {
       // The requester is the signed-in persona; a body field naming someone is ignored.
-      runId = (await session.startRun(who.email, ticket)).id;
+      runId = (await session.startRun(who.email, ticket, reservationId)).id;
     } catch (exc) {
       await deps.settle(reservationId, 0).catch(() => {});
       if (exc instanceof BadRequest) return error(400, exc.message);
@@ -274,10 +279,13 @@ export async function handleDemoApi(
       return error(500, "The run could not start.");
     }
     // Settle at the real cost once the run ends (unknown cost settles as the reservation).
-    const done = session.active.then(
-      () => deps.settle(reservationId, session.runCost(runId) ?? Number.NaN),
-      () => deps.settle(reservationId, Number.NaN),
-    );
+    // If a restart interrupts the run first, the session settles it when it reopens.
+    const done = session.active
+      .then(
+        () => deps.settle(reservationId, session.runCost(runId) ?? Number.NaN),
+        () => deps.settle(reservationId, Number.NaN),
+      )
+      .then(() => session.markSettled(runId));
     deps.waitUntil(done.catch(() => {}));
     return json(202, { run_id: runId });
   }

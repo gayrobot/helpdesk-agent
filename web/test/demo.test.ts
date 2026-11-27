@@ -346,6 +346,10 @@ test("ts_t2_privileged_resets_and_grants_are_refused_before_anyone_is_asked", as
   const events = done.events as Record<string, unknown>[];
   assert.equal(events.length, 2);
   for (const e of events) assert.equal(e.decision, "denied_by_policy", JSON.stringify(e));
+  // The panel names the rule that refused each one.
+  const results = events.map((e) => String(e.result));
+  assert.match(results[0] as string, /may reset MFA only for active accounts with no privileged/);
+  assert.match(results[1] as string, /helpdesk role may only reset MFA, not add_to_group/);
   assert.equal(done.pending, null);
   assert.ok(!auditEvents(d.store).includes("write_approved"));
 });
@@ -450,8 +454,10 @@ test("ts_t2_a_refused_reservation_or_the_kill_switch_makes_no_model_call", async
 });
 
 test("ts_t2_one_ticket_worst_case_fits_the_daily_budget_twice", () => {
+  // 9 calls x (30,000 prompt tokens at the $2.50 cache-write rate + 2,000 out at $10).
+  assert.ok(Math.abs(ticketWorstCaseUsd() - 0.855) < 1e-9, String(ticketWorstCaseUsd()));
   // DEFAULT_LIMITS.dailyUsd is $2; a ticket's worst case must leave room for another.
-  assert.ok(ticketWorstCaseUsd() < 1, String(ticketWorstCaseUsd()));
+  assert.ok(ticketWorstCaseUsd() < 1);
 });
 
 // ---------------------------------------------------------------- session creation
@@ -506,4 +512,49 @@ test("ts_t2_new_sessions_need_turnstile_then_the_visitor_limit", async () => {
     verifyTurnstile: async () => Promise.reject(new Error("x")),
   });
   assert.equal((await handleNewSession({ turnstile: "good" }, siteverifyDown.deps)).status, 403);
+});
+
+test("ts_t2_a_refused_approve_is_audited_once_per_approver", async () => {
+  const d = await demo([reset(JAMIE), DONE]);
+  await d.signIn("helpdesk", THEO);
+  const runId = await d.start("helpdesk", `reset MFA for ${JAMIE}`);
+  const pending = await d.pendingOf(runId);
+  for (let i = 0; i < 3; i++)
+    assert.equal((await d.decide(runId, pending.id, "approve")).status, 409);
+  assert.equal(auditEvents(d.store).filter((e) => e === "approval_refused").length, 1);
+  assert.equal(((await d.pendingOf(runId)).refusals as unknown[]).length, 1);
+  await d.decide(runId, pending.id, "deny");
+  await d.finished(runId);
+});
+
+test("ts_t2_a_run_a_restart_interrupted_settles_from_the_stored_call_log", async () => {
+  // A run that made one model call, then the process stopped mid-approval.
+  const store = new MemoryStore();
+  const first = await Session.open({
+    client: new FakeClient([reset(JAMIE)]),
+    store,
+    retriever,
+    operators: DEMO_HELPDESK,
+    approvalTimeoutMs: 60_000,
+  });
+  const run = await first.startRun(JAMIE, "reset my MFA", "res-1");
+  const deadline = Date.now() + 5_000;
+  while (!first.snapshot(run.id)?.pending && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  assert.deepEqual(await first.unsettled(), []); // still running: nothing to settle yet
+  // Reopen from the same storage, as a restarted Durable Object would.
+  const second = await Session.open({ client: new FakeClient([]), store, retriever });
+  open.push(first, second);
+  assert.equal(second.peek(run.id)?.status, "interrupted");
+  const lost = await second.unsettled();
+  assert.equal(lost.length, 1);
+  assert.equal(lost[0]?.reservationId, "res-1");
+  assert.ok(Math.abs((lost[0]?.costUsd ?? 0) - 0.003) < 1e-9); // the one call made
+  await second.markSettled(run.id);
+  assert.deepEqual(await second.unsettled(), []);
+  // And it stays settled across another restart.
+  const third = await Session.open({ client: new FakeClient([]), store, retriever });
+  open.push(third);
+  assert.deepEqual(await third.unsettled(), []);
 });

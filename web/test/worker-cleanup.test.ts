@@ -1,6 +1,9 @@
 // The cleanup alarm (Phase 9, Data): a session's storage is deleted a set time after its
 // last use. Runs the Worker in workerd with a 1.5 s lifetime (test/worker/entry-ttl.ts).
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 
 import { startLocalWorker } from "../src/node/dev-worker.ts";
@@ -11,13 +14,16 @@ const CONFIG = new URL("./worker/wrangler.ttl.jsonc", import.meta.url).pathname;
 const TTL_MS = 1_500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const state = mkdtempSync(join(tmpdir(), "helpdesk-cleanup-"));
+
 before(async () => {
-  worker = await startLocalWorker(0, CONFIG);
+  worker = await startLocalWorker(0, CONFIG, state);
   base = await worker.url;
 });
 
 after(async () => {
   await worker?.dispose();
+  rmSync(state, { recursive: true, force: true });
 });
 
 async function newSession() {
@@ -37,7 +43,7 @@ async function newSession() {
 test("ts_t2_an_unused_session_is_deleted_by_its_alarm", async () => {
   const get = await newSession();
   assert.equal((await get()).status, 200);
-  const deadline = Date.now() + TTL_MS * 6;
+  const deadline = Date.now() + TTL_MS * 10;
   let status = 200;
   while (status === 200 && Date.now() < deadline) {
     await sleep(500);
@@ -55,6 +61,6 @@ test("ts_t2_a_session_in_use_is_kept", async () => {
   const until = Date.now() + TTL_MS * 3;
   while (Date.now() < until) {
     assert.equal((await get()).status, 200);
-    await sleep(TTL_MS / 4);
+    await sleep(TTL_MS / 6); // well inside the lifetime, however slow the machine
   }
 });

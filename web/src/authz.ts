@@ -84,6 +84,14 @@ export function mayRequest(
   ) {
     return null;
   }
+  if (isHelpdesk(directory, requester)) {
+    // Name the helpdesk rule that refused it, so the page shows which one (tier 2).
+    const rule =
+      tool === "reset_mfa"
+        ? "the helpdesk may reset MFA only for active accounts with no privileged or authority groups"
+        : `the helpdesk role may only reset MFA, not ${tool}`;
+    return `${target.email} is not the requester or someone who reports to them, and ${rule}.`;
+  }
   return (
     `${target.email} is not the requester or someone who reports to them, so this ` +
     "request must come from that person or their manager; escalate if IT needs to look."
