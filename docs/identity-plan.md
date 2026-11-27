@@ -199,7 +199,7 @@ Re-checked against Okta's docs on 2026-11-27. "To confirm" means the docs don't 
 - **Open decisions (Skylar):**
   - **The dev-issuer rule versus tier 2.** `DevIssuer` refuses to start while a real issuer is configured (a hard rule in `CLAUDE.md`). Tier 2 (dev issuer) and tier 3 (Okta) share one Worker, so the rule needs re-scoping, for example per route or per session, before tier 3 is wired.
   - **One audience or three** (above).
-  - **Which personas go into Okta,** and who is the `directory-admins` persona.
+  - **Which personas go into Okta,** and who is the `directory-admins` persona. (2026-11-27, Skylar: the tenant is shared with `identity-lifecycle-agent` (Savory Air), and the helpdesk personas will change to line up with that project.) Today three emails mean different people in the two projects: Rosa Delgado (IT approver here, warehouse director there), Morgan Hale and Omar Haddad. The tenant may be capped at ten active users across both demos. The persona set must be agreed before anything is seeded.
 
 ## I6 notes: MCP
 
